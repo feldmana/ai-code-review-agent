@@ -1,0 +1,21 @@
+# CodeReviewAgent Configuration File
+# Save this as codereview.properties in the project root directory
+
+# Email Configuration (optional)
+EMAIL_ENABLED=false
+EMAIL_TO=your-email@gmail.com
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-specific-password
+SMTP_TLS_ENABLED=true
+
+# Review Configuration
+MAX_RETRIES=3
+THREAD_POOL_SIZE=4
+
+# Note: For Gmail, you need to:
+# 1. Enable 2-Factor Authentication
+# 2. Generate an App-Specific Password
+# 3. Use that password here instead of your Google password
+
