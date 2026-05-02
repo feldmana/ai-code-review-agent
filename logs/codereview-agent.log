@@ -3727,3 +3727,275 @@ Here's my review:
 2026-05-01 23:57:28 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Email sent successfully
 2026-05-01 23:57:28 [INFO ] c.a.c.orchestrator.AgentOrchestrator - === Orchestrator: Task execution completed ===
 2026-05-01 23:57:28 [INFO ] com.agentic.codereview.Main - ✓ Task completed successfully
+2026-05-02 15:38:48 [INFO ] com.agentic.codereview.Main - =================================
+2026-05-02 15:38:48 [INFO ] com.agentic.codereview.Main -   CodeReviewAgent v1.0
+2026-05-02 15:38:48 [INFO ] com.agentic.codereview.Main -   AI-Powered Code Review System
+2026-05-02 15:38:48 [INFO ] com.agentic.codereview.Main - =================================
+2026-05-02 15:38:48 [INFO ] com.agentic.codereview.Main - Configuration loaded: AppConfig{emailEnabled=true, smtpHost='smtp.gmail.com', smtpPort=587, maxRetries=3, threadPoolSize=4}
+2026-05-02 15:38:48 [INFO ] com.agentic.codereview.Main - Testing connection to Ollama at http://localhost:11434
+2026-05-02 15:38:48 [INFO ] com.agentic.codereview.Main - ✓ Connected to Ollama successfully
+2026-05-02 15:38:48 [INFO ] com.agentic.codereview.Main - Executing command: reviewEmail on project: /Users/alexandrafeldman/Documents/Learning/OpenAI/testProject
+2026-05-02 15:38:48 [INFO ] c.a.c.orchestrator.AgentOrchestrator - === Orchestrator: Starting task execution ===
+2026-05-02 15:38:48 [INFO ] c.a.c.orchestrator.AgentOrchestrator - User input: reviewEmail
+2026-05-02 15:38:48 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Project path: /Users/alexandrafeldman/Documents/Learning/OpenAI/testProject
+2026-05-02 15:38:48 [INFO ] c.a.codereview.agent.RouterAgent - Routing task: reviewEmail
+2026-05-02 15:38:48 [INFO ] c.a.codereview.agent.RouterAgent - Task validation passed: Task{id='382ae0ef-3ad4-439a-a56b-ce80a24a4054', type=REVIEW_CODE, projectPath='/Users/alexandrafeldman/Documents/Learning/OpenAI/testProject'}
+2026-05-02 15:38:48 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Task routed to: REVIEW_CODE
+2026-05-02 15:38:48 [INFO ] c.a.codereview.agent.PlannerAgent - Creating plan for task: reviewEmail
+2026-05-02 15:38:48 [INFO ] c.a.codereview.agent.PlannerAgent - Created plan with 5 actions
+2026-05-02 15:38:48 [INFO ] c.a.codereview.agent.PlannerAgent - Plan validation successful
+2026-05-02 15:38:48 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Execution plan created with 5 actions
+2026-05-02 15:38:48 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Executing action 1: SCAN_FILES
+2026-05-02 15:38:48 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Action: Scanning files in /Users/alexandrafeldman/Documents/Learning/OpenAI/testProject
+2026-05-02 15:38:48 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Found 4 code files
+2026-05-02 15:38:48 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Executing action 2: REVIEW_FILES
+2026-05-02 15:38:48 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Action: Reviewing files
+2026-05-02 15:38:48 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Reviewing 4 files
+2026-05-02 15:38:48 [INFO ] c.a.codereview.agent.ReviewAgent - Attempting review of Main.java (attempt 1/3)
+2026-05-02 15:38:48 [INFO ] c.a.codereview.agent.ReviewAgent - Attempting review of productcontroller.java (attempt 1/3)
+2026-05-02 15:38:48 [INFO ] c.a.codereview.agent.ReviewAgent - Attempting review of usercontroller.java (attempt 1/3)
+2026-05-02 15:38:48 [INFO ] c.a.codereview.agent.ReviewAgent - Attempting review of OrderService.java (attempt 1/3)
+2026-05-02 15:39:10 [INFO ] c.a.codereview.agent.ReviewAgent - === RAW LLM RESPONSE [OrderService.java] ===
+Here's my review of the OrderService.java file:
+
+{
+  "issues": [
+    {
+      "type": "string",
+      "severity": "MEDIUM",
+      "message": "The `TAX_RATE` constant is a magic number. It should be replaced with a named constant or an enum.",
+      "suggestion": "Consider creating a separate enum or class for tax rates"
+    },
+    {
+      "type": "string",
+      "severity": "LOW",
+      "message": "The `calculateTotalPrice` method does not handle the case where `price` is negative. It should be validated.",
+      "suggestion": "Add a validation check at the beginning of the method to ensure the price is positive"
+    }
+  ],
+  "suggestions": [],
+  "severity": "MEDIUM"
+}
+
+Note: I've only returned two issues, as per your request.
+2026-05-02 15:39:22 [INFO ] c.a.codereview.agent.ReviewAgent - === RAW LLM RESPONSE [Main.java] ===
+A new code to review!
+
+Here's my report:
+
+**JSON Output:**
+{
+  "issues": [
+    {
+      "type": "STYLE",
+      "severity": "MEDIUM",
+      "message": "Unused comment detected. Remove or refactor unnecessary comments.",
+      "suggestion": "Remove or refactor the commented-out text."
+    },
+    {
+      "type": "STANDARD",
+      "severity": "LOW",
+      "message": "No Javadoc comments found for class 'Main'. Consider adding Javadoc to describe this class's purpose and behavior.",
+      "suggestion": "Add a Javadoc comment to describe the class's purpose."
+    }
+  ],
+  "suggestions": ["Remove or refactor unnecessary comments", "Add Javadoc comments"],
+  "severity": "MEDIUM"
+}
+
+**Summary:**
+Two issues detected. The first is an unused comment, which should be removed or refactored to keep the code clean. The second is a lack of Javadoc comments for the class 'Main', which would improve the code's readability and maintainability.
+2026-05-02 15:39:34 [INFO ] c.a.codereview.agent.ReviewAgent - === RAW LLM RESPONSE [productcontroller.java] ===
+Here is the JSON output for your code review:
+
+{
+  "issues": [
+    {
+      "type": "code_smell",
+      "severity": "MEDIUM",
+      "message": "The `saveProduct` method contains direct business logic, which violates the principle of Separation of Concerns.",
+      "suggestion": "Move business logic to a separate service or use an existing one, and keep this controller focused on handling requests."
+    },
+    {
+      "type": "best_practice",
+      "severity": "LOW",
+      "message": "The `get_data` method does not seem to be doing anything useful. Consider removing it or replacing it with a meaningful operation.",
+      "suggestion": "Review the purpose of this method and consider refactoring or removing it if it's not serving any specific purpose."
+    }
+  ],
+  "suggestions": [],
+  "severity": "MEDIUM"
+}
+
+Note that I've returned only valid JSON, and I've never truncated the output. Additionally, I've limited my issues to a maximum of 2 as per your request!
+2026-05-02 15:39:45 [INFO ] c.a.codereview.agent.ReviewAgent - === RAW LLM RESPONSE [usercontroller.java] ===
+Here is my review result in JSON format:
+
+{
+  "issues": [
+    {
+      "type": "METHOD_NAME",
+      "severity": "MEDIUM",
+      "message": "The method names 'getuser' and 'fetch_data' do not follow the conventional naming conventions. It's recommended to use camelCase for method names.",
+      "suggestion": "Rename methods to something like getUserInfo() and fetchData()"
+    },
+    {
+      "type": "CLASS_NAME",
+      "severity": "HIGH",
+      "message": "The class name 'usercontroller' does not follow the conventional naming conventions. It's recommended to use PascalCase for class names.",
+      "suggestion": "Rename class to something like UserViewController"
+    }
+  ],
+  "suggestions": ["Use camelCase for method names", "Use PascalCase for class names"],
+  "severity": "MEDIUM"
+}
+
+Please note that I've only reported 2 issues as per your request.
+2026-05-02 15:39:45 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Completed review of 4 files
+2026-05-02 15:39:45 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Executing action 3: SUMMARIZE
+2026-05-02 15:39:45 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Action: Summarizing reviews
+2026-05-02 15:39:45 [INFO ] c.a.codereview.agent.SummaryAgent - Summarizing 4 reviews
+2026-05-02 15:39:45 [INFO ] c.a.codereview.agent.SummaryAgent - Summary created: 4 files, 8 total issues
+2026-05-02 15:39:45 [INFO ] c.a.codereview.agent.SummaryAgent - Severity breakdown - High: 0, Medium: 4, Low: 0
+2026-05-02 15:39:45 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Summary: Summary{filesReviewed=4, totalIssues=8, high=0, medium=4, low=0}
+2026-05-02 15:39:45 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Executing action 4: WRITE_REPORT
+2026-05-02 15:39:45 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Action: Writing report
+2026-05-02 15:39:45 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Report written to: /Users/alexandrafeldman/Documents/Learning/OpenAI/CodeReviewAgent/reports/code_review_report_20260502_153945.md
+2026-05-02 15:39:45 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Executing action 5: SEND_EMAIL
+2026-05-02 15:39:45 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Action: Sending email report
+2026-05-02 15:39:45 [INFO ] c.a.codereview.agent.EmailAgent - Sending email report to: afeldman66@gmail.com
+2026-05-02 15:39:47 [INFO ] c.a.codereview.agent.EmailAgent - Email sent successfully to: afeldman66@gmail.com
+2026-05-02 15:39:47 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Email sent successfully
+2026-05-02 15:39:47 [INFO ] c.a.c.orchestrator.AgentOrchestrator - === Orchestrator: Task execution completed ===
+2026-05-02 15:39:47 [INFO ] com.agentic.codereview.Main - ✓ Task completed successfully
+2026-05-02 15:45:28 [INFO ] com.agentic.codereview.Main - =================================
+2026-05-02 15:45:28 [INFO ] com.agentic.codereview.Main -   CodeReviewAgent v1.0
+2026-05-02 15:45:28 [INFO ] com.agentic.codereview.Main -   AI-Powered Code Review System
+2026-05-02 15:45:28 [INFO ] com.agentic.codereview.Main - =================================
+2026-05-02 15:45:28 [INFO ] com.agentic.codereview.Main - Configuration loaded: AppConfig{emailEnabled=true, smtpHost='smtp.gmail.com', smtpPort=587, maxRetries=3, threadPoolSize=4}
+2026-05-02 15:45:29 [INFO ] com.agentic.codereview.Main - Testing connection to Ollama at http://localhost:11434
+2026-05-02 15:45:29 [INFO ] com.agentic.codereview.Main - ✓ Connected to Ollama successfully
+2026-05-02 15:45:29 [INFO ] com.agentic.codereview.Main - Executing command: reviewEmail on project: /Users/alexandrafeldman/Documents/Learning/OpenAI/testProject
+2026-05-02 15:45:29 [INFO ] c.a.c.orchestrator.AgentOrchestrator - === Orchestrator: Starting task execution ===
+2026-05-02 15:45:29 [INFO ] c.a.c.orchestrator.AgentOrchestrator - User input: reviewEmail
+2026-05-02 15:45:29 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Project path: /Users/alexandrafeldman/Documents/Learning/OpenAI/testProject
+2026-05-02 15:45:29 [INFO ] c.a.codereview.agent.RouterAgent - Routing task: reviewEmail
+2026-05-02 15:45:29 [INFO ] c.a.codereview.agent.RouterAgent - Task validation passed: Task{id='4defe7cf-3829-4938-bee5-5926005835a1', type=REVIEW_CODE, projectPath='/Users/alexandrafeldman/Documents/Learning/OpenAI/testProject'}
+2026-05-02 15:45:29 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Task routed to: REVIEW_CODE
+2026-05-02 15:45:29 [INFO ] c.a.codereview.agent.PlannerAgent - Creating plan for task: reviewEmail
+2026-05-02 15:45:29 [INFO ] c.a.codereview.agent.PlannerAgent - Created plan with 5 actions
+2026-05-02 15:45:29 [INFO ] c.a.codereview.agent.PlannerAgent - Plan validation successful
+2026-05-02 15:45:29 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Execution plan created with 5 actions
+2026-05-02 15:45:29 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Executing action 1: SCAN_FILES
+2026-05-02 15:45:29 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Action: Scanning files in /Users/alexandrafeldman/Documents/Learning/OpenAI/testProject
+2026-05-02 15:45:29 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Found 4 code files
+2026-05-02 15:45:29 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Executing action 2: REVIEW_FILES
+2026-05-02 15:45:29 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Action: Reviewing files
+2026-05-02 15:45:29 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Reviewing 4 files
+2026-05-02 15:45:29 [INFO ] c.a.codereview.agent.ReviewAgent - Attempting review of Main.java (attempt 1/3)
+2026-05-02 15:45:29 [INFO ] c.a.codereview.agent.ReviewAgent - Attempting review of productcontroller.java (attempt 1/3)
+2026-05-02 15:45:29 [INFO ] c.a.codereview.agent.ReviewAgent - Attempting review of usercontroller.java (attempt 1/3)
+2026-05-02 15:45:29 [INFO ] c.a.codereview.agent.ReviewAgent - Attempting review of OrderService.java (attempt 1/3)
+2026-05-02 15:45:44 [INFO ] c.a.codereview.agent.ReviewAgent - === RAW LLM RESPONSE [OrderService.java] ===
+Here's the JSON output for your code review:
+
+{
+  "issues": [
+    {
+      "type": "naming",
+      "severity": "MEDIUM",
+      "message": "Class name should be PascalCase (OrderService -> OrderServiceImpl)",
+      "suggestion": "Rename class to follow Java naming conventions"
+    },
+    {
+      "type": "booleans",
+      "severity": "LOW",
+      "message": "Boolean variable names should start with 'is', 'has', or 'can' (hasDiscount -> hasUserAppliedDiscount)",
+      "suggestion": "Rename boolean variable to follow best practices"
+    }
+  ],
+  "suggestions": ["Consider adding Javadoc comments for method descriptions"],
+  "severity": "MEDIUM"
+}
+
+Note that there are only two issues reported, and both are related to naming conventions.
+2026-05-02 15:45:52 [INFO ] c.a.codereview.agent.ReviewAgent - === RAW LLM RESPONSE [usercontroller.java] ===
+{ "issues": [
+  { "type": "naming", "severity": "MEDIUM", "message": "Class name should start with a capital letter.", "suggestion": "Rename to UserController." },
+  { "type": "naming", "severity": "HIGH", "message": "Method and variable names should follow the correct case conventions (PascalCase for classes, camelCase for methods).", "suggestion": "Review and adjust method and variable names accordingly." }
+], 
+"suggestions": ["Rename class to UserController.", "Adhere to naming conventions for methods and variables."], 
+"severity": "MEDIUM" }
+2026-05-02 15:46:03 [INFO ] c.a.codereview.agent.ReviewAgent - === RAW LLM RESPONSE [productcontroller.java] ===
+Here is the code review in JSON format:
+
+{
+  "issues": [
+    {
+      "type": "architecture",
+      "severity": "HIGH",
+      "message": "Directly calling Database from controller breaks separation of concerns. Consider introducing a service layer to encapsulate business logic.",
+      "suggestion": "Extract business logic into separate service class and inject it into the controller."
+    },
+    {
+      "type": "naming-convention",
+      "severity": "MEDIUM",
+      "message": "Class name does not follow PascalCase convention. It should be ProductController instead of productcontroller.",
+      "suggestion": "Rename the class to ProductController and all other classes following the same naming convention."
+    }
+  ],
+  "suggestions": [
+    "Consider using a more robust logging mechanism than System.out.println"
+  ],
+  "severity": "MEDIUM"
+}
+2026-05-02 15:46:12 [INFO ] c.a.codereview.agent.ReviewAgent - === RAW LLM RESPONSE [Main.java] ===
+{
+  "issues": [
+    {
+      "type": "naming",
+      "severity": "HIGH",
+      "message": "Package naming convention violated: Package must start with 'com.feldmana'",
+      "suggestion": "Rename package to com.feldmana"
+    },
+    {
+      "type": "naming",
+      "severity": "MEDIUM",
+      "message": "Class name not following PascalCase convention: Class names should be nouns or noun phrases",
+      "suggestion": "Rename class to MainService"
+    }
+  ],
+  "suggestions": ["Consider using more descriptive variable names"],
+  "severity": "HIGH"
+2026-05-02 15:46:12 [ERROR] c.a.codereview.agent.ReviewAgent - ❌ Invalid JSON:
+{
+  "issues": [
+    {
+      "type": "naming",
+      "severity": "HIGH",
+      "message": "Package naming convention violated: Package must start with 'com.feldmana'",
+      "suggestion": "Rename package to com.feldmana"
+    },
+    {
+      "type": "naming",
+      "severity": "MEDIUM",
+      "message": "Class name not following PascalCase convention: Class names should be nouns or noun phrases",
+      "suggestion": "Rename class to MainService"
+    }
+2026-05-02 15:46:12 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Completed review of 4 files
+2026-05-02 15:46:12 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Executing action 3: SUMMARIZE
+2026-05-02 15:46:12 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Action: Summarizing reviews
+2026-05-02 15:46:12 [INFO ] c.a.codereview.agent.SummaryAgent - Summarizing 4 reviews
+2026-05-02 15:46:12 [INFO ] c.a.codereview.agent.SummaryAgent - Summary created: 4 files, 6 total issues
+2026-05-02 15:46:12 [INFO ] c.a.codereview.agent.SummaryAgent - Severity breakdown - High: 0, Medium: 3, Low: 1
+2026-05-02 15:46:12 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Summary: Summary{filesReviewed=4, totalIssues=6, high=0, medium=3, low=1}
+2026-05-02 15:46:12 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Executing action 4: WRITE_REPORT
+2026-05-02 15:46:12 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Action: Writing report
+2026-05-02 15:46:12 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Report written to: /Users/alexandrafeldman/Documents/Learning/OpenAI/CodeReviewAgent/reports/code_review_report_20260502_154612.md
+2026-05-02 15:46:12 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Executing action 5: SEND_EMAIL
+2026-05-02 15:46:12 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Action: Sending email report
+2026-05-02 15:46:12 [INFO ] c.a.codereview.agent.EmailAgent - Sending email report to: afeldman66@gmail.com
+2026-05-02 15:46:14 [INFO ] c.a.codereview.agent.EmailAgent - Email sent successfully to: afeldman66@gmail.com
+2026-05-02 15:46:14 [INFO ] c.a.c.orchestrator.AgentOrchestrator - Email sent successfully
+2026-05-02 15:46:14 [INFO ] c.a.c.orchestrator.AgentOrchestrator - === Orchestrator: Task execution completed ===
+2026-05-02 15:46:14 [INFO ] com.agentic.codereview.Main - ✓ Task completed successfully

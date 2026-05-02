@@ -3,6 +3,7 @@ package com.agentic.codereview.agent;
 import com.agentic.codereview.llm.OllamaClient;
 import com.agentic.codereview.model.Issue;
 import com.agentic.codereview.model.ReviewResult;
+import com.agentic.codereview.rag.RagService;
 import com.agentic.codereview.util.JsonExtractor;
 import com.google.gson.*;
 import org.slf4j.Logger;
@@ -15,11 +16,13 @@ public class ReviewAgent {
 
     private static final Logger logger = LoggerFactory.getLogger(ReviewAgent.class);
 
+    private RagService ragService;
     private final OllamaClient ollamaClient;
     private final int maxRetries;
     private final Gson gson = new Gson();
 
-    public ReviewAgent(OllamaClient ollamaClient, int maxRetries) {
+    public ReviewAgent(RagService ragService, OllamaClient ollamaClient, int maxRetries) {
+        this.ragService = ragService;
         this.ollamaClient = ollamaClient;
         this.maxRetries = maxRetries;
     }
@@ -36,6 +39,10 @@ public class ReviewAgent {
                         fileName, attempt, maxRetries);
 
                 String prompt = buildReviewPrompt(fileName, content);
+                List<String> rules = ragService.getRelevantRules(content);
+                String rulesText = String.join("\n\n", rules);
+
+                prompt = rulesText + "\n\n" + prompt;
                 String llmResponse = ollamaClient.generateResponse(prompt);
 
                 logger.info("=== RAW LLM RESPONSE [{}] ===\n{}", fileName, llmResponse);

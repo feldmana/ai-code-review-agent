@@ -52,7 +52,7 @@ public class AgentOrchestrator {
         // Initialize agents
         this.routerAgent = new RouterAgent();
         this.plannerAgent = new PlannerAgent();
-        this.reviewAgent = new ReviewAgent(ollamaClient, appConfig.getMaxRetries());
+        this.reviewAgent = new ReviewAgent(ragService,ollamaClient, appConfig.getMaxRetries());
         this.summaryAgent = new SummaryAgent();
         this.emailAgent = new EmailAgent(appConfig);
 
