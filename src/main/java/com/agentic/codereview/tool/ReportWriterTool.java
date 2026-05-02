@@ -1,14 +1,19 @@
 package com.agentic.codereview.tool;
 
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.time.LocalDateTime;
+import java.text.SimpleDateFormat;
 import java.time.format.DateTimeFormatter;
+import java.util.Date;
 import java.util.List;
 
+
+import com.agentic.codereview.model.Issue;
 import com.agentic.codereview.model.ReviewResult;
 import com.agentic.codereview.model.Summary;
 
@@ -21,47 +26,89 @@ public class ReportWriterTool {
     /**
      * Writes a markdown report from the summary
      */
-    public String generateReport(Summary summary, String projectPath) throws IOException {
+    public String generateReport(List<ReviewResult> reviews) {
+
         StringBuilder report = new StringBuilder();
 
-        // Header
         report.append("# Code Review Report\n\n");
-        report.append("**Generated:** ").append(summary.getGeneratedAt()).append("\n");
-        report.append("**Project Path:** ").append(projectPath).append("\n\n");
+        report.append("Generated at: ").append(new java.util.Date()).append("\n\n");
 
-        // Summary Statistics
-        report.append("## Summary Statistics\n\n");
-        report.append("- **Files Reviewed:** ").append(summary.getReviews().size()).append("\n");
-        report.append("- **Total Issues:** ").append(summary.getTotalIssues()).append("\n");
-        report.append("- **High Severity:** ").append(summary.getHighSeverityCount()).append("\n");
-        report.append("- **Medium Severity:** ").append(summary.getMediumSeverityCount()).append("\n");
-        report.append("- **Low Severity:** ").append(summary.getLowSeverityCount()).append("\n\n");
+        int totalIssues = 0;
+        int high = 0, medium = 0, low = 0;
 
-        // Detailed Reviews
-        report.append("## Detailed Reviews\n\n");
+        for (ReviewResult review : reviews) {
 
-        for (ReviewResult review : summary.getReviews()) {
-            report.append("### File: `").append(review.getFileName()).append("`\n\n");
-            report.append("**Severity:** ").append(review.getSeverity()).append("\n\n");
+            report.append("## File: ")
+                    .append(review.getFileName())
+                    .append("\n\n");
 
-            if (!review.getIssues().isEmpty()) {
-                report.append("#### Issues\n");
-                for (String issue : review.getIssues()) {
-                    report.append("- ").append(issue).append("\n");
+            // -------------------------
+            // Issues
+            // -------------------------
+            List<Issue> issues = review.getIssues();
+
+            if (issues != null && !issues.isEmpty()) {
+                report.append("### Issues\n");
+
+                for (Issue issue : issues) {
+                    report.append("- [")
+                            .append(issue.getSeverity())
+                            .append("] ")
+                            .append(issue.getType())
+                            .append(": ")
+                            .append(issue.getMessage());
+
+                    if (issue.getSuggestion() != null && !issue.getSuggestion().isEmpty()) {
+                        report.append(" → ")
+                                .append(issue.getSuggestion());
+                    }
+
+                    report.append("\n");
+
+                    totalIssues++;
+
+                    // severity stats
+                    if (issue.getSeverity() != null) {
+                        switch (issue.getSeverity()) {
+                            case HIGH -> high++;
+                            case MEDIUM -> medium++;
+                            case LOW -> low++;
+                        }
+                    }
                 }
+
                 report.append("\n");
+            } else {
+                report.append("No issues found.\n\n");
             }
 
-            if (!review.getSuggestions().isEmpty()) {
-                report.append("#### Suggestions\n");
-                for (String suggestion : review.getSuggestions()) {
+            // -------------------------
+            // Suggestions
+            // -------------------------
+            List<String> suggestions = review.getSuggestions();
+
+            if (suggestions != null && !suggestions.isEmpty()) {
+                report.append("### Suggestions\n");
+
+                for (String suggestion : suggestions) {
                     report.append("- ").append(suggestion).append("\n");
                 }
+
                 report.append("\n");
             }
 
             report.append("---\n\n");
         }
+
+        // -------------------------
+        // Summary section
+        // -------------------------
+        report.append("# Summary\n\n");
+        report.append("- Total files: ").append(reviews.size()).append("\n");
+        report.append("- Total issues: ").append(totalIssues).append("\n");
+        report.append("- High: ").append(high).append("\n");
+        report.append("- Medium: ").append(medium).append("\n");
+        report.append("- Low: ").append(low).append("\n");
 
         return report.toString();
     }
@@ -69,18 +116,40 @@ public class ReportWriterTool {
     /**
      * Writes the report to a file
      */
-    public String writeReportToFile(Summary summary, String projectPath, String outputDir) throws IOException {
-        String reportContent = generateReport(summary, projectPath);
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-        String fileName = outputDir + "/code_review_report_" + timestamp + ".md";
 
-        Files.writeString(Paths.get(fileName), reportContent, StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 
-        return fileName;
-    }
 
-    /**
+
+
+        /**
+         * Writes markdown report to file
+         */
+        public String writeReportToFile(String reportContent, String reportDir) throws IOException {
+
+            // Ensure directory exists
+            File dir = new File(reportDir);
+            if (!dir.exists()) {
+                dir.mkdirs();
+            }
+
+            // Create timestamped filename
+            String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+            String fileName = "code_review_report_" + timestamp + ".md";
+
+            File reportFile = new File(dir, fileName);
+
+            // Write file
+            try (FileWriter writer = new FileWriter(reportFile)) {
+                writer.write(reportContent);
+            }
+
+            return reportFile.getAbsolutePath();
+        }
+
+
+
+
+     /**
      * Appends to an existing report file
      */
     public void appendToReport(String filePath, String content) throws IOException {

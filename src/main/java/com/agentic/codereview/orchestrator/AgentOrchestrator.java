@@ -7,9 +7,11 @@ import com.agentic.codereview.model.Action;
 import com.agentic.codereview.model.ReviewResult;
 import com.agentic.codereview.model.Summary;
 import com.agentic.codereview.model.Task;
+import com.agentic.codereview.rag.RagService;
 import com.agentic.codereview.tool.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.agentic.codereview.model.*;
 
 import java.io.IOException;
 import java.util.*;
@@ -27,6 +29,7 @@ public class AgentOrchestrator {
     private final ReviewAgent reviewAgent;
     private final SummaryAgent summaryAgent;
     private final EmailAgent emailAgent;
+    private final RagService ragService;
 
     // Tools
     private final FileScannerTool fileScannerTool;
@@ -41,7 +44,8 @@ public class AgentOrchestrator {
     private List<ReviewResult> reviews;
     private Summary summary;
 
-    public AgentOrchestrator(AppConfig appConfig, OllamaClient ollamaClient) {
+    public AgentOrchestrator(RagService ragService, AppConfig appConfig, OllamaClient ollamaClient) {
+        this.ragService = ragService;
         this.appConfig = appConfig;
         this.ollamaClient = ollamaClient;
 
@@ -105,7 +109,7 @@ public class AgentOrchestrator {
                 case SCAN_FILES -> scanFiles(projectPath);
                 case REVIEW_FILES -> reviewFiles(projectPath);
                 case SUMMARIZE -> summarizeReviews();
-                case WRITE_REPORT -> writeReport(projectPath);
+                case WRITE_REPORT -> writeReport();
                 case SEND_EMAIL -> sendEmailReport();
                 default -> logger.warn("Unknown action: {}", action.getAction());
             }
@@ -230,10 +234,39 @@ public class AgentOrchestrator {
         logger.info("Summary: {}", summary);
     }
 
+    private void writeReport() throws IOException {
+        logger.info("Action: Writing report");
+
+        if (reviews == null || reviews.isEmpty()) {
+            logger.warn("No reviews available, skipping report generation");
+            return;
+        }
+
+        String reportDir = "reports";
+        new java.io.File(reportDir).mkdirs();
+
+        String report = reportWriterTool.generateReport(reviews);
+
+        String filePath = reportWriterTool.writeReportToFile(report, reportDir);
+
+        logger.info("Report written to: {}", filePath);
+    }
     /**
      * Writes the markdown report
      */
-    private void writeReport(String projectPath) throws IOException {
+    private void writeReport1(String projectPath) throws IOException {
+        logger.info("Action: Writing report");
+
+        String reportDir = "reports";
+        new java.io.File(reportDir).mkdirs();
+
+        String report = reportWriterTool.generateReport(reviews);
+
+        String filePath = reportWriterTool.writeReportToFile(report, reportDir);
+        logger.info("Report written to: {}", filePath);
+    }
+
+    /*private void writeReport1(String projectPath) throws IOException {
         logger.info("Action: Writing report");
 
         if (summary == null) {
@@ -246,7 +279,7 @@ public class AgentOrchestrator {
 
         String reportPath = reportWriterTool.writeReportToFile(summary, projectPath, reportDir);
         logger.info("Report written to: {}", reportPath);
-    }
+    }*/
 
     /**
      * Sends the report via email if enabled
@@ -265,7 +298,7 @@ public class AgentOrchestrator {
         }
 
         try {
-            String reportContent = reportWriterTool.generateReport(summary, "project");
+            String reportContent = reportWriterTool.generateReport(reviews);
             String subject = "Code Review Report - " + new java.text.SimpleDateFormat("yyyy-MM-dd").format(new java.util.Date());
 
             if (emailAgent.sendReport(reportContent, subject)) {

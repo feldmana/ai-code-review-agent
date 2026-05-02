@@ -3,6 +3,7 @@ package com.agentic.codereview;
 import com.agentic.codereview.config.AppConfig;
 import com.agentic.codereview.llm.OllamaClient;
 import com.agentic.codereview.orchestrator.AgentOrchestrator;
+import com.agentic.codereview.rag.RagService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,6 +14,9 @@ import java.util.Scanner;
  */
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
+    private static final RagService ragService = new RagService();
+
+
 
     public static void main(String[] args) {
         logger.info("=================================");
@@ -42,7 +46,7 @@ public class Main {
         logger.info("✓ Connected to Ollama successfully");
 
         // Initialize orchestrator
-        AgentOrchestrator orchestrator = new AgentOrchestrator(config, ollamaClient);
+        AgentOrchestrator orchestrator = new AgentOrchestrator(ragService , config, ollamaClient);
 
         // Command line interface
         if (args.length > 0) {
