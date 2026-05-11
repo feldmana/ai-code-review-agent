@@ -1,0 +1,285 @@
+package com.agentic.codereview.rag;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+/**
+ * Vector RAG Service - Production Implementation
+ *
+ * Features:
+ * - Loads markdown/text documents from disk
+ * - Performs keyword + semantic similarity search
+ * - Returns top-K relevant documents/chunks
+ * - In-memory vector storage with smart chunking
+ * - No external dependencies required
+ *
+ * Usage:
+ *   VectorRagService rag = new VectorRagService("rag-docs/rules");
+ *   rag.initialize();
+ *   List<String> relevant = rag.getRelevantRules("your code here");
+ */
+public class VectorRagService implements RagService {
+
+    private static final Logger logger = LoggerFactory.getLogger(VectorRagService.class);
+
+    private final String docsPath;
+    private final int topK;
+    private SimpleVectorStore vectorStore;
+    private Map<String, DocumentMetadata> documents;
+    private boolean initialized = false;
+
+    /**
+     * Document metadata for tracking
+     */
+    public static class DocumentMetadata {
+        public String id;
+        public String fileName;
+        public String title;
+        public int chunkCount;
+
+        public DocumentMetadata(String id, String fileName, String title, int chunkCount) {
+            this.id = id;
+            this.fileName = fileName;
+            this.title = title;
+            this.chunkCount = chunkCount;
+        }
+    }
+
+    /**
+     * Constructor
+     * @param docsPath path to documents directory
+     * @param topK number of top results to return
+     */
+    public VectorRagService(String docsPath, int topK) {
+        this.docsPath = docsPath;
+        this.topK = topK;
+        this.vectorStore = new SimpleVectorStore();
+        this.documents = new LinkedHashMap<>();
+    }
+
+    /**
+     * Constructor with default topK=5
+     */
+    public VectorRagService(String docsPath) {
+        this(docsPath, 5);
+    }
+
+    /**Ø
+     * Initialize the RAG service: load documents
+     */
+    public void initialize() {
+        try {
+            logger.info("Initializing Vector RAG Service from: {}", docsPath);
+
+            // Load documents and chunks into vector store
+            loadDocuments();
+
+            this.initialized = true;
+            logger.info("✓ Vector RAG Service initialized");
+            logger.info("  - Documents: {}", documents.size());
+            logger.info("  - Total chunks in vector store: {}", vectorStore.size());
+
+        } catch (Exception e) {
+            logger.error("Failed to initialize Vector RAG Service", e);
+            throw new RuntimeException("RAG initialization failed", e);
+        }
+    }
+
+    /**
+     * Load all documents from the docs directory
+     */
+    private void loadDocuments() throws IOException {
+        Path docsDir = Paths.get(docsPath);
+
+        if (!Files.exists(docsDir)) {
+            logger.warn("Documentation directory not found: {}", docsPath);
+            Files.createDirectories(docsDir);
+            return;
+        }
+
+        logger.info("Loading documents from: {}", docsDir);
+
+        try (Stream<Path> paths = Files.walk(docsDir)) {
+            paths.filter(Files::isRegularFile)
+                    .filter(this::isDocumentFile)
+                    .forEach(this::loadDocument);
+        }
+
+        logger.info("✓ Loaded {} documents", documents.size());
+    }
+
+    /**
+     * Check if file is a document we should load
+     */
+    private boolean isDocumentFile(Path path) {
+        String fileName = path.getFileName().toString().toLowerCase();
+        return fileName.endsWith(".md") || fileName.endsWith(".txt");
+    }
+
+    /**
+     * Load a single document and split into chunks
+     */
+    private void loadDocument(Path path) {
+        try {
+            String content = Files.readString(path, StandardCharsets.UTF_8);
+            String id = path.getFileName().toString();
+            String title = extractTitle(id);
+
+            List<String> chunks = splitIntoChunks(content);
+            int chunkCount = 0;
+
+            // Add each chunk to vector store
+            for (int i = 0; i < chunks.size(); i++) {
+                String chunkId = id + "_chunk_" + i;
+                vectorStore.add(chunkId, chunks.get(i));
+                chunkCount++;
+            }
+
+            documents.put(id, new DocumentMetadata(id, id, title, chunkCount));
+            logger.debug("Loaded document: {} ({} chunks)", id, chunkCount);
+
+        } catch (IOException e) {
+            logger.error("Failed to load document: {}", path, e);
+        }
+    }
+
+    /**
+     * Extract title from filename
+     */
+    private String extractTitle(String fileName) {
+        return fileName.replace(".md", "")
+                .replace(".txt", "")
+                .replace("-", " ")
+                .replace("_", " ");
+    }
+
+    /**
+     * Split document into chunks (by paragraphs, then sentences)
+     */
+    private List<String> splitIntoChunks(String content) {
+        List<String> chunks = new ArrayList<>();
+        String[] paragraphs = content.split("\n\n+");
+
+        for (String para : paragraphs) {
+            if (!para.trim().isEmpty()) {
+                // Keep paragraphs under 500 chars
+                if (para.length() > 500) {
+                    // Split by sentences
+                    String[] sentences = para.split("[.!?]+");
+                    StringBuilder chunk = new StringBuilder();
+
+                    for (String sentence : sentences) {
+                        if (chunk.length() + sentence.length() > 500) {
+                            if (chunk.length() > 0) {
+                                chunks.add(chunk.toString().trim());
+                                chunk = new StringBuilder();
+                            }
+                        }
+                        chunk.append(sentence).append(". ");
+                    }
+
+                    if (chunk.length() > 0) {
+                        chunks.add(chunk.toString().trim());
+                    }
+                } else {
+                    chunks.add(para.trim());
+                }
+            }
+        }
+
+        return chunks.isEmpty() ? List.of(content) : chunks;
+    }
+
+    /**
+     * Get relevant rules/context for given code using semantic similarity
+     *
+     * @param code source code to analyze
+     * @return list of relevant document chunks
+     */
+    @Override
+    public List<String> getRelevantRules(String code) {
+        if (!initialized) {
+            logger.warn("RAG Service not initialized. Call initialize() first.");
+            return Collections.emptyList();
+        }
+
+        try {
+            logger.debug("Finding relevant rules for code: {} chars", code.length());
+
+            // Find similar chunks in vector store
+            List<String> chunkIds = vectorStore.findSimilar(code, topK);
+
+            // Get actual content
+            List<String> results = new ArrayList<>();
+            for (String chunkId : chunkIds) {
+                String content = vectorStore.get(chunkId);
+                if (content != null && !content.isEmpty()) {
+                    results.add(content);
+                }
+            }
+
+            logger.debug("Found {} relevant rules", results.size());
+            return results;
+
+        } catch (Exception e) {
+            logger.error("Error retrieving relevant rules", e);
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Get statistics about the RAG service
+     */
+    public Map<String, Object> getStats() {
+        return Map.of(
+                "initialized", initialized,
+                "documentCount", documents.size(),
+                "totalChunks", vectorStore.size(),
+                "topK", topK
+        );
+    }
+
+    /**
+     * Get all documents info
+     */
+    public List<Map<String, Object>> listDocuments() {
+        return documents.values().stream()
+                .map(doc -> Map.of(
+                        "id", (Object) doc.id,
+                        "fileName", doc.fileName,
+                        "title", doc.title,
+                        "chunks", (Object) doc.chunkCount
+                ))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Clear all data
+     */
+    public void clear() {
+        vectorStore.clear();
+        documents.clear();
+        initialized = false;
+        logger.info("RAG Service cleared");
+    }
+
+    /**
+     * Check if service is initialized
+     */
+    public boolean isInitialized() {
+        return initialized;
+    }
+
+    public void debugVectorStore() {
+        vectorStore.debugDump();
+    }
+
+
+}

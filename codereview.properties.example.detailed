@@ -1,0 +1,101 @@
+# CodeReviewAgent Configuration Example
+# Copy this to: codereview.properties
+# Or set environment variables with these names
+
+# ============================================
+# OLLAMA CONFIGURATION
+# ============================================
+# Note: These can be hardcoded in AppConfig.java if preferred
+# OLLAMA_HOST=http://localhost
+# OLLAMA_PORT=11434
+# OLLAMA_MODEL=llama3
+
+# ============================================
+# EMAIL CONFIGURATION
+# ============================================
+
+# Enable/Disable email sending
+EMAIL_ENABLED=true
+
+# Recipient email address
+EMAIL_TO=afeldman66@gmail.com
+
+# SMTP Server Settings
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+
+# SMTP Authentication
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-specific-password
+
+# Enable TLS encryption
+SMTP_TLS_ENABLED=true
+
+# ============================================
+# REVIEW CONFIGURATION
+# ============================================
+
+# Number of retries if LLM fails to generate valid JSON
+MAX_RETRIES=3
+
+# Thread pool size for parallel file processing
+THREAD_POOL_SIZE=4
+
+# ============================================
+# GMAIL SETUP (Step-by-Step)
+# ============================================
+# 1. Go to: https://myaccount.google.com/security
+# 2. Enable "2-Step Verification" if not enabled
+# 3. Go to: https://myaccount.google.com/apppasswords
+# 4. Select "Mail" and "Other (custom name)"
+# 5. Copy the 16-character password
+# 6. Use it in SMTP_PASSWORD above
+#
+# Note: Do NOT use your regular Gmail password
+# App passwords are more secure and can be revoked
+
+# ============================================
+# OTHER SMTP PROVIDERS
+# ============================================
+
+# Outlook/Office 365:
+# SMTP_HOST=smtp.office365.com
+# SMTP_PORT=587
+# SMTP_USERNAME=your-email@outlook.com
+
+# SendGrid:
+# SMTP_HOST=smtp.sendgrid.net
+# SMTP_PORT=587
+# SMTP_USERNAME=apikey
+# SMTP_PASSWORD=your-sendgrid-api-key
+
+# AWS SES:
+# SMTP_HOST=email-smtp.region.amazonaws.com
+# SMTP_PORT=587
+# SMTP_USERNAME=your-aws-smtp-username
+# SMTP_PASSWORD=your-aws-smtp-password
+
+# ============================================
+# ENVIRONMENT VARIABLE OVERRIDE
+# ============================================
+# You can set these as env vars instead of properties file:
+#
+# export EMAIL_ENABLED=true
+# export EMAIL_TO=afeldman66@gmail.com
+# export SMTP_HOST=smtp.gmail.com
+# export SMTP_PORT=587
+# export SMTP_USERNAME=your-email@gmail.com
+# export SMTP_PASSWORD=your-app-specific-password
+# export SMTP_TLS_ENABLED=true
+# export MAX_RETRIES=3
+# export THREAD_POOL_SIZE=4
+#
+# java -jar CodeReviewAgent.jar "review /path/to/project"
+
+# ============================================
+# PRIORITY (What overrides what)
+# ============================================
+# 1. Environment Variables (highest priority)
+# 2. codereview.properties file
+# 3. Default values in AppConfig.java (lowest priority)
+
