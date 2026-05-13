@@ -228,7 +228,7 @@ public class EnhancedVectorRagService implements RagService {
             if (RAG_TRACE) {
                 logger.info("MATCHED CHUNKS: {}", results.size());
                 for (EmbeddingVector v : results) {
-                    logger.info("  - {} (score: {:.4f}, source: {}, category: {})",
+                    logger.info("  - ID: {} | Score: {:.4f} | Source: {} | Category: {}",
                             v.getId(), v.getRelevanceScore(), v.getSource(), v.getCategory());
                 }
             }

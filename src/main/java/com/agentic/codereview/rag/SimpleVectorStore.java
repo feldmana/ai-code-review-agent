@@ -117,5 +117,21 @@ public class SimpleVectorStore {
     public int size() {
         return vectors.size();
     }
+
+    public void debugDump() {
+        System.out.println("\n========== VECTOR STORE DUMP ==========");
+
+        for (Map.Entry<String, Vector> entry : vectors.entrySet()) {
+            Vector v = entry.getValue();
+
+            System.out.println("ID: " + v.id);
+            System.out.println("CONTENT: " + v.content);
+            System.out.println("TERMS: " + v.terms);
+            System.out.println("--------------------------------------");
+        }
+
+        System.out.println("TOTAL VECTORS: " + vectors.size());
+        System.out.println("======================================\n");
+    }
 }
 

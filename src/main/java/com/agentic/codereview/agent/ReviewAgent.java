@@ -3,23 +3,32 @@ package com.agentic.codereview.agent;
 import com.agentic.codereview.llm.OllamaClient;
 import com.agentic.codereview.model.Issue;
 import com.agentic.codereview.model.ReviewResult;
+import com.agentic.codereview.prompt.PromptConstants;
+import com.agentic.codereview.rag.RagContextBuilder;
 import com.agentic.codereview.rag.RagService;
 import com.agentic.codereview.util.JsonExtractor;
-import com.google.gson.*;
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * ReviewAgent - Enhanced with RAG context and structured prompts
+ */
 public class ReviewAgent {
 
     private static final Logger logger = LoggerFactory.getLogger(ReviewAgent.class);
-
-    private RagService ragService;
     private final OllamaClient ollamaClient;
     private final int maxRetries;
     private final Gson gson = new Gson();
+    private final RagService ragService;
+    
+    // Enable contextual review with code type detection
+    private static final boolean ENABLE_CONTEXT_DETECTION = true;
 
     public ReviewAgent(RagService ragService, OllamaClient ollamaClient, int maxRetries) {
         this.ragService = ragService;
@@ -38,11 +47,24 @@ public class ReviewAgent {
                 logger.info("Attempting review of {} (attempt {}/{})",
                         fileName, attempt, maxRetries);
 
-                String prompt = buildReviewPrompt(fileName, content);
+                // Retrieve relevant rules from RAG
                 List<String> rules = ragService.getRelevantRules(content);
-                String rulesText = String.join("\n\n", rules);
+                
+                // Build structured context
+                String ragContext = RagContextBuilder.buildReviewContext(rules, content);
+                
+                // Detect code type for specialized review
+                String codeType = RagContextBuilder.detectCodeType(content);
+                String typeContext = RagContextBuilder.buildRecommendationContext(codeType);
+                
+                logger.debug("Detected code type: {}", codeType);
 
-                prompt = rulesText + "\n\n" + prompt;
+                // Build final prompt with all context
+                String prompt = buildReviewPrompt(fileName, content, ragContext, typeContext);
+
+                logger.info("=== FINAL PROMPT SENT TO LLM ===");
+                logger.info(prompt);
+
                 String llmResponse = ollamaClient.generateResponse(prompt);
 
                 logger.info("=== RAW LLM RESPONSE [{}] ===\n{}", fileName, llmResponse);
@@ -74,36 +96,12 @@ public class ReviewAgent {
         return fallbackResult(fileName);
     }
 
-    private String buildReviewPrompt(String fileName, String content) {
-        return """
-            You are a senior Java software architect and strict code reviewer.
-
-            RULES:
-            - RETURN ONLY VALID JSON
-            - NEVER TRUNCATE OUTPUT
-            - MAX 2 ISSUES ONLY
-
-            FORMAT:
-            {
-              "issues": [
-                {
-                  "type": "string",
-                  "severity": "LOW|MEDIUM|HIGH",
-                  "message": "string",
-                  "suggestion": "string"
-                }
-              ],
-              "suggestions": ["string"],
-              "severity": "LOW|MEDIUM|HIGH"
-            }
-
-            FILE: %s
-
-            CODE:
-            ```
-            %s
-            ```
-            """.formatted(fileName, content);
+    private String buildReviewPrompt(String fileName, String content, String ragContext, String typeContext) {
+        return ragContext + typeContext + String.format(
+                PromptConstants.FULL_PROMPT,
+                fileName,
+                content
+        );
     }
 
     private ReviewResult parseReviewResult(JsonObject obj, String fileName) {

@@ -46,7 +46,7 @@ public class PlannerAgent {
 
         logger.info("Created plan with {} actions", actions.size());
         for (Action action : actions) {
-            logger.debug("Action {}: {}", action.getSequenceNumber(), action.getAction());
+            logger.debug("Action {}: {}", action.sequenceNumber(), action.action());
         }
 
         return actions;
@@ -60,9 +60,9 @@ public class PlannerAgent {
 
         for (Action action : actions) {
             JsonObject actionObj = new JsonObject();
-            actionObj.addProperty("sequence", action.getSequenceNumber());
-            actionObj.addProperty("action", action.getAction().toString());
-            actionObj.addProperty("description", action.getDescription());
+            actionObj.addProperty("sequence", action.sequenceNumber());
+            actionObj.addProperty("action", action.action().toString());
+            actionObj.addProperty("description", action.description());
             actionsArray.add(actionObj);
         }
 
@@ -80,7 +80,7 @@ public class PlannerAgent {
 
         // Check that actions are sequentially numbered
         for (int i = 0; i < actions.size(); i++) {
-            if (actions.get(i).getSequenceNumber() != i + 1) {
+            if (actions.get(i).sequenceNumber() != i + 1) {
                 logger.warn("Invalid action sequence at position {}", i);
                 return false;
             }

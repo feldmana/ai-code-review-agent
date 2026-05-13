@@ -5,7 +5,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
 /**
@@ -52,7 +54,7 @@ public class FileScannerTool {
         return !path.toString().contains("/.") ||
                 EXCLUDE_DIRS.stream().noneMatch(excluded ->
                         path.toString().contains(File.separator + excluded + File.separator) ||
-                        path.toString().contains("/" + excluded + "/"));
+                                path.toString().contains("/" + excluded + "/"));
     }
 
     /**

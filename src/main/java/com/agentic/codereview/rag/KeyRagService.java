@@ -6,7 +6,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-public class RagService {
+public class KeyRagService implements RagService {
 
     private static final String RULES_PATH = "rag-docs/rules";
 
@@ -61,10 +61,6 @@ public class RagService {
             return true; // always relevant
         }
 
-        if (fileName.contains("bad-examples")) {
-            return true;
-        }
-
-        return false;
+        return fileName.contains("bad-examples");
     }
 }

@@ -5,7 +5,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -25,9 +27,9 @@ import java.util.stream.Stream;
  *   rag.initialize();
  *   List<String> relevant = rag.getRelevantRules("your code here");
  */
-public class VectorRagService implements RagService {
+public class VectorRagService1 implements RagService {
 
-    private static final Logger logger = LoggerFactory.getLogger(VectorRagService.class);
+    private static final Logger logger = LoggerFactory.getLogger(VectorRagService1.class);
 
     private final String docsPath;
     private final int topK;
@@ -57,7 +59,7 @@ public class VectorRagService implements RagService {
      * @param docsPath path to documents directory
      * @param topK number of top results to return
      */
-    public VectorRagService(String docsPath, int topK) {
+    public VectorRagService1(String docsPath, int topK) {
         this.docsPath = docsPath;
         this.topK = topK;
         this.vectorStore = new SimpleVectorStore();
@@ -67,7 +69,7 @@ public class VectorRagService implements RagService {
     /**
      * Constructor with default topK=5
      */
-    public VectorRagService(String docsPath) {
+    public VectorRagService1(String docsPath) {
         this(docsPath, 5);
     }
 

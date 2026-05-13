@@ -1,70 +1,284 @@
 package com.agentic.codereview.rag;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-public class KeyRagService implements RagService {
+/**
+ * Vector RAG Service - Production Implementation (with TRACE logging)
+ */
+public class VectorRagService implements RagService {
 
-    private static final String RULES_PATH = "rag-docs/rules";
+    private static final Logger logger = LoggerFactory.getLogger(VectorRagService.class);
+
+    // 🔥 ENABLE / DISABLE TRACE LOGGING
+    private static final boolean RAG_TRACE = true;
+
+    private final String docsPath;
+    private final int topK;
+
+    private final SimpleVectorStore vectorStore;
+    private final Map<String, DocumentMetadata> documents;
+    private boolean initialized = false;
 
     /**
-     * Simple RAG v1:
-     * - loads markdown files
-     * - selects relevant ones using keywords
+     * Document metadata for tracking
      */
-    public List<String> getRelevantRules(String code) {
+    public static class DocumentMetadata {
+        public String id;
+        public String fileName;
+        public String title;
+        public int chunkCount;
 
-        List<String> rules = new ArrayList<>();
-
-        try {
-            // Load all rule files
-            List<Path> files = Files.list(Path.of(RULES_PATH))
-                    .filter(p -> p.toString().endsWith(".md"))
-                    .toList();
-
-            for (Path file : files) {
-                String content = Files.readString(file);
-
-                if (isRelevant(file.getFileName().toString(), code)) {
-                    rules.add(content);
-                }
-            }
-
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to load RAG rules", e);
+        public DocumentMetadata(String id, String fileName, String title, int chunkCount) {
+            this.id = id;
+            this.fileName = fileName;
+            this.title = title;
+            this.chunkCount = chunkCount;
         }
+    }
 
-        return rules;
+    public VectorRagService(String docsPath, int topK) {
+        this.docsPath = docsPath;
+        this.topK = topK;
+        this.vectorStore = new SimpleVectorStore();
+        this.documents = new LinkedHashMap<>();
+    }
+
+    public VectorRagService(String docsPath) {
+        this(docsPath, 5);
     }
 
     /**
-     * VERY SIMPLE relevance logic (we'll upgrade later to embeddings)
+     * Initialize RAG service
      */
-    private boolean isRelevant(String fileName, String code) {
+    public void initialize() {
+        try {
+            logger.info("Initializing Vector RAG Service from: {}", docsPath);
 
-        fileName = fileName.toLowerCase();
+            loadDocuments();
 
-        if (fileName.contains("naming")) {
-            return code.contains("class") || code.contains("void");
+            this.initialized = true;
+
+            logger.info("✓ Vector RAG Service initialized");
+            logger.info("  - Documents: {}", documents.size());
+            logger.info("  - Total chunks in vector store: {}", vectorStore.size());
+
+        } catch (Exception e) {
+            logger.error("Failed to initialize Vector RAG Service", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Load documents from disk
+     */
+    private void loadDocuments() throws IOException {
+        Path docsDir = Paths.get(docsPath);
+
+        if (!Files.exists(docsDir)) {
+            logger.warn("Docs directory not found: {}", docsPath);
+            Files.createDirectories(docsDir);
+            return;
         }
 
-        if (fileName.contains("architecture")) {
-            return code.contains("Controller") ||
-                    code.contains("Service") ||
-                    code.contains("Repository");
+        logger.info("Loading documents from: {}", docsDir);
+
+        try (Stream<Path> paths = Files.walk(docsDir)) {
+            paths.filter(Files::isRegularFile)
+                    .filter(this::isDocumentFile)
+                    .forEach(this::loadDocument);
         }
 
-        if (fileName.contains("quality")) {
-            return true; // always relevant
+        logger.info("✓ Loaded {} documents", documents.size());
+    }
+
+    private boolean isDocumentFile(Path path) {
+        String fileName = path.getFileName().toString().toLowerCase();
+        return fileName.endsWith(".md") || fileName.endsWith(".txt");
+    }
+
+    /**
+     * Load single document
+     */
+    private void loadDocument(Path path) {
+        try {
+            String content = Files.readString(path, StandardCharsets.UTF_8);
+
+            String id = path.getFileName().toString();
+            String title = extractTitle(id);
+
+            List<String> chunks = splitIntoChunks(content);
+
+            int chunkCount = 0;
+
+            for (int i = 0; i < chunks.size(); i++) {
+                String chunkId = id + "_chunk_" + i;
+                vectorStore.add(chunkId, chunks.get(i));
+                chunkCount++;
+            }
+
+            documents.put(id, new DocumentMetadata(id, id, title, chunkCount));
+
+            logger.debug("Loaded document: {} ({} chunks)", id, chunkCount);
+
+        } catch (IOException e) {
+            logger.error("Failed to load document: {}", path, e);
+        }
+    }
+
+    private String extractTitle(String fileName) {
+        return fileName.replace(".md", "")
+                .replace(".txt", "")
+                .replace("-", " ")
+                .replace("_", " ");
+    }
+
+    /**
+     * Split into chunks
+     */
+    private List<String> splitIntoChunks(String content) {
+        List<String> chunks = new ArrayList<>();
+        String[] paragraphs = content.split("\n\n+");
+
+        for (String para : paragraphs) {
+            if (!para.trim().isEmpty()) {
+
+                if (para.length() > 500) {
+                    String[] sentences = para.split("[.!?]+");
+                    StringBuilder chunk = new StringBuilder();
+
+                    for (String sentence : sentences) {
+                        if (chunk.length() + sentence.length() > 500) {
+                            if (chunk.length() > 0) {
+                                chunks.add(chunk.toString().trim());
+                                chunk = new StringBuilder();
+                            }
+                        }
+                        chunk.append(sentence).append(". ");
+                    }
+
+                    if (chunk.length() > 0) {
+                        chunks.add(chunk.toString().trim());
+                    }
+
+                } else {
+                    chunks.add(para.trim());
+                }
+            }
         }
 
-        if (fileName.contains("bad-examples")) {
-            return true;
+        return chunks.isEmpty() ? List.of(content) : chunks;
+    }
+
+    /**
+     * 🔥 MAIN RAG METHOD (NOW FULLY TRACEABLE)
+     */
+    @Override
+    public List<String> getRelevantRules(String code) {
+
+        if (!initialized) {
+            logger.warn("RAG not initialized");
+            return Collections.emptyList();
         }
 
-        return false;
+        try {
+
+            if (RAG_TRACE) {
+                logger.info("\n================ RAG QUERY ================");
+                logger.info("INPUT SIZE: {} chars", code.length());
+            }
+
+            // STEP 1: retrieve
+            List<String> chunkIds = vectorStore.findSimilar(code, topK);
+
+            if (RAG_TRACE) {
+                logger.info("MATCHED CHUNKS IDS: {}", chunkIds);
+            }
+
+            // STEP 2: resolve content
+            List<String> results = new ArrayList<>();
+
+            for (String chunkId : chunkIds) {
+
+                String content = vectorStore.get(chunkId);
+
+                if (content != null) {
+                    results.add(content);
+
+                    if (RAG_TRACE) {
+                        logger.info("\n--- CHUNK: {} ---", chunkId);
+                        logger.info("CONTENT:\n{}", truncate(content));
+                    }
+                }
+            }
+
+            if (RAG_TRACE) {
+                logger.info("FINAL RAG COUNT: {}", results.size());
+                logger.info("===========================================\n");
+            }
+
+            return results;
+
+        } catch (Exception e) {
+            logger.error("RAG retrieval error", e);
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Stats
+     */
+    public Map<String, Object> getStats() {
+        return Map.of(
+                "initialized", initialized,
+                "documentCount", documents.size(),
+                "totalChunks", vectorStore.size(),
+                "topK", topK
+        );
+    }
+    public List<Map<String, Object>> listDocuments() {
+        return documents.values().stream()
+                .map(doc -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("id", doc.id);
+                    map.put("fileName", doc.fileName);
+                    map.put("title", doc.title);
+                    map.put("chunks", doc.chunkCount);
+                    return map;
+                })
+                .collect(Collectors.toList());
+    }
+
+    public void clear() {
+        vectorStore.clear();
+        documents.clear();
+        initialized = false;
+        logger.info("RAG cleared");
+    }
+
+    public boolean isInitialized() {
+        return initialized;
+    }
+
+    /**
+     * 🔥 DEBUG VECTOR DB DUMP
+     */
+    public void debugVectorStore() {
+        vectorStore.debugDump();
+    }
+
+    /**
+     * helper
+     */
+    private String truncate(String text) {
+        if (text == null) return "null";
+        return text.length() > 300 ? text.substring(0, 300) + "..." : text;
     }
 }

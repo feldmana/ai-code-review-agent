@@ -6,12 +6,12 @@ import java.util.List;
  * Represents the aggregated summary of all code reviews
  */
 public class Summary {
-    private List<ReviewResult> reviews;
+    private final List<ReviewResult> reviews;
+    private final String generatedAt;
     private int totalIssues;
     private int highSeverityCount;
     private int mediumSeverityCount;
     private int lowSeverityCount;
-    private String generatedAt;
 
     public Summary(List<ReviewResult> reviews) {
         this.reviews = reviews;
@@ -36,12 +36,29 @@ public class Summary {
     }
 
     // Getters
-    public List<ReviewResult> getReviews() { return reviews; }
-    public int getTotalIssues() { return totalIssues; }
-    public int getHighSeverityCount() { return highSeverityCount; }
-    public int getMediumSeverityCount() { return mediumSeverityCount; }
-    public int getLowSeverityCount() { return lowSeverityCount; }
-    public String getGeneratedAt() { return generatedAt; }
+    public List<ReviewResult> getReviews() {
+        return reviews;
+    }
+
+    public int getTotalIssues() {
+        return totalIssues;
+    }
+
+    public int getHighSeverityCount() {
+        return highSeverityCount;
+    }
+
+    public int getMediumSeverityCount() {
+        return mediumSeverityCount;
+    }
+
+    public int getLowSeverityCount() {
+        return lowSeverityCount;
+    }
+
+    public String getGeneratedAt() {
+        return generatedAt;
+    }
 
     @Override
     public String toString() {

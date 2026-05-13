@@ -1,5 +1,8 @@
 package com.agentic.codereview.tool;
 
+import com.agentic.codereview.model.Issue;
+import com.agentic.codereview.model.ReviewResult;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -11,11 +14,6 @@ import java.text.SimpleDateFormat;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.List;
-
-
-import com.agentic.codereview.model.Issue;
-import com.agentic.codereview.model.ReviewResult;
-import com.agentic.codereview.model.Summary;
 
 /**
  * Tool for writing markdown reports
@@ -118,38 +116,33 @@ public class ReportWriterTool {
      */
 
 
+    /**
+     * Writes markdown report to file
+     */
+    public String writeReportToFile(String reportContent, String reportDir) throws IOException {
 
-
-
-        /**
-         * Writes markdown report to file
-         */
-        public String writeReportToFile(String reportContent, String reportDir) throws IOException {
-
-            // Ensure directory exists
-            File dir = new File(reportDir);
-            if (!dir.exists()) {
-                dir.mkdirs();
-            }
-
-            // Create timestamped filename
-            String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-            String fileName = "code_review_report_" + timestamp + ".md";
-
-            File reportFile = new File(dir, fileName);
-
-            // Write file
-            try (FileWriter writer = new FileWriter(reportFile)) {
-                writer.write(reportContent);
-            }
-
-            return reportFile.getAbsolutePath();
+        // Ensure directory exists
+        File dir = new File(reportDir);
+        if (!dir.exists()) {
+            dir.mkdirs();
         }
 
+        // Create timestamped filename
+        String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        String fileName = "code_review_report_" + timestamp + ".md";
+
+        File reportFile = new File(dir, fileName);
+
+        // Write file
+        try (FileWriter writer = new FileWriter(reportFile)) {
+            writer.write(reportContent);
+        }
+
+        return reportFile.getAbsolutePath();
+    }
 
 
-
-     /**
+    /**
      * Appends to an existing report file
      */
     public void appendToReport(String filePath, String content) throws IOException {

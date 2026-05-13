@@ -7,7 +7,8 @@ public class Issue {
     private String message;
     private String suggestion;
 
-    public Issue() {}
+    public Issue() {
+    }
 
     public String getType() {
         return type;

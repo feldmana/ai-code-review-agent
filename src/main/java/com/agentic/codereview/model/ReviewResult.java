@@ -2,22 +2,18 @@ package com.agentic.codereview.model;
 
 import java.util.List;
 import java.util.Objects;
-import com.agentic.codereview.model.Issue;
+
 /**
  * Represents the review result for a single file
  */
 public class ReviewResult {
 
-    public enum Severity {
-        LOW, MEDIUM, HIGH
-    }
-
-    private String fileName;
+    private final String fileName;
+    private final long reviewedAt;
     private List<Issue> issues;
     private List<String> suggestions;
     private Severity severity;
     private String fileContent;
-    private long reviewedAt;
 
     public ReviewResult(String fileName,
                         List<Issue> issues,
@@ -31,11 +27,11 @@ public class ReviewResult {
         this.reviewedAt = System.currentTimeMillis();
     }
 
-    // Getters and Setters
-
     public String getFileName() {
         return fileName;
     }
+
+    // Getters and Setters
 
     public List<Issue> getIssues() {
         return issues;
@@ -81,5 +77,9 @@ public class ReviewResult {
                 ", issuesCount=" + (issues == null ? 0 : issues.size()) +
                 ", suggestionsCount=" + (suggestions == null ? 0 : suggestions.size()) +
                 '}';
+    }
+
+    public enum Severity {
+        LOW, MEDIUM, HIGH
     }
 }

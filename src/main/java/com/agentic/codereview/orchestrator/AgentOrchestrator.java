@@ -8,13 +8,16 @@ import com.agentic.codereview.model.ReviewResult;
 import com.agentic.codereview.model.Summary;
 import com.agentic.codereview.model.Task;
 import com.agentic.codereview.rag.RagService;
-import com.agentic.codereview.tool.*;
+import com.agentic.codereview.tool.FileReaderTool;
+import com.agentic.codereview.tool.FileScannerTool;
+import com.agentic.codereview.tool.ReportWriterTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.agentic.codereview.model.*;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.*;
 
 /**
@@ -41,7 +44,7 @@ public class AgentOrchestrator {
     private final OllamaClient ollamaClient;
 
     // State
-    private List<ReviewResult> reviews;
+    private final List<ReviewResult> reviews;
     private Summary summary;
 
     public AgentOrchestrator(RagService ragService, AppConfig appConfig, OllamaClient ollamaClient) {
@@ -52,7 +55,7 @@ public class AgentOrchestrator {
         // Initialize agents
         this.routerAgent = new RouterAgent();
         this.plannerAgent = new PlannerAgent();
-        this.reviewAgent = new ReviewAgent(ragService,ollamaClient, appConfig.getMaxRetries());
+        this.reviewAgent = new ReviewAgent(ragService, ollamaClient, appConfig.getMaxRetries());
         this.summaryAgent = new SummaryAgent();
         this.emailAgent = new EmailAgent(appConfig);
 
@@ -103,15 +106,15 @@ public class AgentOrchestrator {
      */
     private void executePlan(List<Action> plan, String projectPath) throws Exception {
         for (Action action : plan) {
-            logger.info("Executing action {}: {}", action.getSequenceNumber(), action.getAction());
+            logger.info("Executing action {}: {}", action.sequenceNumber(), action.action());
 
-            switch (action.getAction()) {
+            switch (action.action()) {
                 case SCAN_FILES -> scanFiles(projectPath);
                 case REVIEW_FILES -> reviewFiles(projectPath);
                 case SUMMARIZE -> summarizeReviews();
                 case WRITE_REPORT -> writeReport();
                 case SEND_EMAIL -> sendEmailReport();
-                default -> logger.warn("Unknown action: {}", action.getAction());
+                default -> logger.warn("Unknown action: {}", action.action());
             }
         }
     }
@@ -251,35 +254,6 @@ public class AgentOrchestrator {
 
         logger.info("Report written to: {}", filePath);
     }
-    /**
-     * Writes the markdown report
-     */
-    private void writeReport1(String projectPath) throws IOException {
-        logger.info("Action: Writing report");
-
-        String reportDir = "reports";
-        new java.io.File(reportDir).mkdirs();
-
-        String report = reportWriterTool.generateReport(reviews);
-
-        String filePath = reportWriterTool.writeReportToFile(report, reportDir);
-        logger.info("Report written to: {}", filePath);
-    }
-
-    /*private void writeReport1(String projectPath) throws IOException {
-        logger.info("Action: Writing report");
-
-        if (summary == null) {
-            logger.warn("No summary available, skipping report generation");
-            return;
-        }
-
-        String reportDir = "reports";
-        new java.io.File(reportDir).mkdirs();
-
-        String reportPath = reportWriterTool.writeReportToFile(summary, projectPath, reportDir);
-        logger.info("Report written to: {}", reportPath);
-    }*/
 
     /**
      * Sends the report via email if enabled
@@ -311,10 +285,38 @@ public class AgentOrchestrator {
         }
     }
 
+    /**
+     * Runs a full review pipeline and returns the generated report as a string.
+     * Used by MCP tools so they can return the report content directly.
+     */
+    public String runReviewAndGetReport(String projectPath) throws Exception {
+        executeTask("review code", projectPath);
+        return reportWriterTool.generateReport(reviews);
+    }
+
+    /**
+     * Runs a full review pipeline and sends the report via email.
+     * Used by MCP tools.
+     */
+    public void runReviewAndSendEmail(String projectPath) throws Exception {
+        executeTask("review code and send email", projectPath);
+    }
+
     // Getters
-    public List<ReviewResult> getReviews() { return reviews; }
-    public Summary getSummary() { return summary; }
-    public RouterAgent getRouterAgent() { return routerAgent; }
-    public PlannerAgent getPlannerAgent() { return plannerAgent; }
+    public List<ReviewResult> getReviews() {
+        return reviews;
+    }
+
+    public Summary getSummary() {
+        return summary;
+    }
+
+    public RouterAgent getRouterAgent() {
+        return routerAgent;
+    }
+
+    public PlannerAgent getPlannerAgent() {
+        return plannerAgent;
+    }
 }
 

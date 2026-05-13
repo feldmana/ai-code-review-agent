@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
+    <!-- WARN-only console: errors/warnings appear in the chat window -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>WARN</level>
+        </filter>
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%-5level] %logger{36} - %msg%n</pattern>
+            <pattern>[LOG] %-5level %logger{20} - %msg%n</pattern>
         </encoder>
     </appender>
 
@@ -23,9 +27,10 @@
     <logger name="com.google.gson" level="WARN"/>
     <logger name="okhttp3" level="WARN"/>
 
+    <!-- INFO+ goes to file; WARN+ also appears in the chat window -->
     <root level="INFO">
-        <appender-ref ref="CONSOLE"/>
         <appender-ref ref="FILE"/>
+        <appender-ref ref="CONSOLE"/>
     </root>
 </configuration>
 

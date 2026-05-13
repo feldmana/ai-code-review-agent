@@ -8,13 +8,18 @@ import java.util.Properties;
  * Application configuration loaded from properties file or environment variables
  */
 public class AppConfig {
-    private static final String CONFIG_FILE = "codereview.properties";
-
     // Ollama Configuration
     public static final String OLLAMA_HOST = "http://localhost";
     public static final int OLLAMA_PORT = 11434;
     public static final String OLLAMA_MODEL = "llama3"; // Can be overridden
-
+    private static final String CONFIG_FILE = "codereview.properties";
+    private static AppConfig instance;
+    private final boolean enableParallelProcessing = true;
+    // MCP Configuration
+    private boolean mcpEnabled;
+    private int mcpPort;
+    private int mcpRequestTimeout;
+    private int mcpConnectionPoolSize;
     // Email Configuration
     private boolean emailEnabled;
     private String emailTo;
@@ -23,13 +28,9 @@ public class AppConfig {
     private String smtpUsername;
     private String smtpPassword;
     private boolean smtpTlsEnabled;
-
     // Review Configuration
     private int maxRetries = 3;
-    private boolean enableParallelProcessing = true;
     private int threadPoolSize = 4;
-
-    private static AppConfig instance;
 
     private AppConfig() {
         loadConfiguration();
@@ -67,6 +68,20 @@ public class AppConfig {
                 getProperty(props, "SMTP_TLS_ENABLED", System.getenv("SMTP_TLS_ENABLED"), "true")
         );
 
+        // MCP Configuration
+        this.mcpEnabled = Boolean.parseBoolean(
+                getProperty(props, "MCP_ENABLED", System.getenv("MCP_ENABLED"), "false")
+        );
+        this.mcpPort = Integer.parseInt(
+                getProperty(props, "MCP_PORT", System.getenv("MCP_PORT"), "9876")
+        );
+        this.mcpRequestTimeout = Integer.parseInt(
+                getProperty(props, "MCP_REQUEST_TIMEOUT", System.getenv("MCP_REQUEST_TIMEOUT"), "30")
+        );
+        this.mcpConnectionPoolSize = Integer.parseInt(
+                getProperty(props, "MCP_CONNECTION_POOL_SIZE", System.getenv("MCP_CONNECTION_POOL_SIZE"), "10")
+        );
+
         // Review Configuration
         this.maxRetries = Integer.parseInt(
                 getProperty(props, "MAX_RETRIES", System.getenv("MAX_RETRIES"), "3")
@@ -84,16 +99,62 @@ public class AppConfig {
     }
 
     // Getters
-    public boolean isEmailEnabled() { return emailEnabled; }
-    public String getEmailTo() { return emailTo; }
-    public String getSmtpHost() { return smtpHost; }
-    public int getSmtpPort() { return smtpPort; }
-    public String getSmtpUsername() { return smtpUsername; }
-    public String getSmtpPassword() { return smtpPassword; }
-    public boolean isSmtpTlsEnabled() { return smtpTlsEnabled; }
-    public int getMaxRetries() { return maxRetries; }
-    public boolean isParallelProcessingEnabled() { return enableParallelProcessing; }
-    public int getThreadPoolSize() { return threadPoolSize; }
+    public boolean isEmailEnabled() {
+        return emailEnabled;
+    }
+
+    public String getEmailTo() {
+        return emailTo;
+    }
+
+    public String getSmtpHost() {
+        return smtpHost;
+    }
+
+    public int getSmtpPort() {
+        return smtpPort;
+    }
+
+    public String getSmtpUsername() {
+        return smtpUsername;
+    }
+
+    public String getSmtpPassword() {
+        return smtpPassword;
+    }
+
+    public boolean isSmtpTlsEnabled() {
+        return smtpTlsEnabled;
+    }
+
+    // MCP Getters
+    public boolean isMcpEnabled() {
+        return mcpEnabled;
+    }
+
+    public int getMcpPort() {
+        return mcpPort;
+    }
+
+    public int getMcpRequestTimeout() {
+        return mcpRequestTimeout;
+    }
+
+    public int getMcpConnectionPoolSize() {
+        return mcpConnectionPoolSize;
+    }
+
+    public int getMaxRetries() {
+        return maxRetries;
+    }
+
+    public boolean isParallelProcessingEnabled() {
+        return enableParallelProcessing;
+    }
+
+    public int getThreadPoolSize() {
+        return threadPoolSize;
+    }
 
     @Override
     public String toString() {
@@ -101,6 +162,8 @@ public class AppConfig {
                 "emailEnabled=" + emailEnabled +
                 ", smtpHost='" + smtpHost + '\'' +
                 ", smtpPort=" + smtpPort +
+                ", mcpEnabled=" + mcpEnabled +
+                ", mcpPort=" + mcpPort +
                 ", maxRetries=" + maxRetries +
                 ", threadPoolSize=" + threadPoolSize +
                 '}';

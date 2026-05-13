@@ -78,19 +78,19 @@ public class SummaryAgent {
         int avgIssuesPerFile = totalFiles > 0 ? totalIssues / totalFiles : 0;
 
         return String.format("""
-                Code Review Executive Summary
-                ==============================
-                Total Files Reviewed: %d
-                Total Issues Found: %d
-                Average Issues per File: %d
-                
-                Severity Distribution:
-                - High: %d files
-                - Medium: %d files
-                - Low: %d files
-                
-                Generated: %s
-                """,
+                        Code Review Executive Summary
+                        ==============================
+                        Total Files Reviewed: %d
+                        Total Issues Found: %d
+                        Average Issues per File: %d
+                        
+                        Severity Distribution:
+                        - High: %d files
+                        - Medium: %d files
+                        - Low: %d files
+                        
+                        Generated: %s
+                        """,
                 totalFiles, totalIssues, avgIssuesPerFile,
                 summary.getHighSeverityCount(),
                 summary.getMediumSeverityCount(),

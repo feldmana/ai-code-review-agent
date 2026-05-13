@@ -1,6 +1,8 @@
 package com.agentic.codereview.llm;
 
-import com.google.gson.*;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,9 +55,7 @@ public class OllamaClient {
 
         requestBody.add("messages", messages);
 
-        // 🔴 FIX 2: better visibility for debugging
-        System.out.println("Calling Ollama URL: " + url);
-        System.out.println("Request JSON: " + requestBody);
+        logger.debug("Calling Ollama URL: {}, model: {}", url, model);
 
         Request request = new Request.Builder()
                 .url(url)
@@ -100,6 +100,7 @@ public class OllamaClient {
 
         return text.substring(start, end + 1);
     }
+
     /**
      * Test connection
      */

@@ -67,7 +67,7 @@ public class EnhancedVectorStore {
     private float computeBM25(EmbeddingVector query, EmbeddingVector doc) {
         final float k1 = 1.5f;    // Term frequency saturation
         final float b = 0.75f;    // Length normalization
-        final float avgDocLength = vectors.values().stream()
+        final float avgDocLength = (float) vectors.values().stream()
                 .mapToInt(EmbeddingVector::getLength)
                 .average()
                 .orElse(100);
