@@ -40,8 +40,9 @@ import java.util.Scanner;
 public class ChatMCPClient {
 
     private static final Logger logger = LoggerFactory.getLogger(ChatMCPClient.class);
-    private static final int    MCP_PORT_START = 9877; // will auto-pick next free port if busy
-    private static final String STAR_LINE      = "★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★";
+    private static final int    MCP_PORT_START    = 9877;
+    private static final String STAR_LINE         = "★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★";
+    private static final int    MAX_HISTORY_TURNS = 10; // keep last 10 user+assistant pairs
     private static final String RAG_PATH       = "rag-docs";
     private static final String REPORTS_DIR    = "chat-reports";
     private static final String DEFAULT_PATH   = "/Users/alexandrafeldman/Documents/Learning/OpenAI/testProject";
@@ -58,6 +59,15 @@ public class ChatMCPClient {
     private String sessionProjectPath    = null;
     private String sessionReportContent  = null;
     private String sessionProjectName    = null;
+
+    // ── Conversation history — rolling window sent to Ollama for multi-turn ────
+    private final List<java.util.Map<String, String>> conversationHistory = new java.util.ArrayList<>();
+
+    // ── Completed actions — injected into system prompt as hard facts ─────────
+    private final List<String> completedActions = new java.util.ArrayList<>();
+
+    // ── Last Ollama response — offered as quick-send candidate in email flow ──
+    private String lastOllamaResponse = null;
 
     // ── Session transcript — full chat + MCP details saved to file ────────────
     private PrintWriter transcriptWriter = null;
@@ -94,6 +104,10 @@ public class ChatMCPClient {
             String input = scanner.nextLine().trim();
             if (input.isEmpty()) continue;
             logConversation("YOU", input);
+            if (input.equalsIgnoreCase("clear") || input.equalsIgnoreCase("new conversation")) {
+                clearHistory();
+                continue;
+            }
             if (input.equalsIgnoreCase("exit") || input.equalsIgnoreCase("quit")) {
                 System.out.println("Goodbye!");
                 logger.info(STAR_LINE);
@@ -124,14 +138,14 @@ public class ChatMCPClient {
         transcript("[AI] Intent: " + intent);
 
         switch (intent) {
-            case "REVIEW"  -> handleReview(scanner);
-            case "EMAIL"   -> handleEmail(scanner);
-            case "SUMMARY" -> handleSummary(scanner);
-            case "LIST"    -> handleList();
-            case "DATE"    -> handleDate(userInput);
-            case "TIP"     -> handleTip(userInput, scanner);
+            case "REVIEW"  -> { addToHistory("user", userInput); handleReview(scanner); }
+            case "EMAIL"   -> { addToHistory("user", userInput); handleEmail(scanner); }
+            case "SUMMARY" -> { addToHistory("user", userInput); handleSummary(scanner); }
+            case "LIST"    -> { addToHistory("user", userInput); handleList(); }
+            case "DATE"    -> { addToHistory("user", userInput); handleDate(userInput); }
+            case "TIP"     -> { addToHistory("user", userInput); handleTip(userInput, scanner); }
             case "HELP"    -> printWelcome();
-            default        -> handleFreeChat(userInput); // any other question → Ollama
+            default        -> handleFreeChat(userInput); // free chat manages its own history
         }
     }
 
@@ -141,28 +155,52 @@ public class ChatMCPClient {
 
     private void handleReview(Scanner scanner) throws Exception {
         String projectPath = askProjectPath(scanner);
-        String projectName = Path.of(projectPath).getFileName().toString();
 
+        while (true) {
+            boolean ok = runReview(projectPath);
+            if (!ok) break;
+
+            System.out.println("\n[Chat] Options:");
+            System.out.println("  [R] Regenerate — re-run the review on the same project");
+            System.out.println("  [E] Email this report");
+            System.out.println("  Enter   — done");
+            System.out.print("Choice: ");
+            String choice = scanner.nextLine().trim().toUpperCase();
+
+            if (choice.equals("R")) {
+                System.out.println("\n[Chat] Re-running review...");
+            } else if (choice.equals("E")) {
+                handleEmail(scanner);
+                break;
+            } else {
+                break;
+            }
+        }
+    }
+
+    /** Core review logic — scans, reviews, saves, updates session. Returns false on scan failure. */
+    private boolean runReview(String projectPath) throws Exception {
+        String projectName = Path.of(projectPath).getFileName().toString();
         System.out.println("\n══════════ Review via MCP ══════════");
 
         // ── Step 1: scan_files ───────────────────────────────────────────────
         JsonObject scanInput = new JsonObject();
         scanInput.addProperty("projectPath", projectPath);
-        String scanResponse = callMCPTool("scan_files", scanInput);
-
-        JsonObject scanResult = unwrapResult(scanResponse);
-        if (scanResult == null) return;
+        JsonObject scanResult = unwrapResult(callMCPTool("scan_files", scanInput));
+        if (scanResult == null) return false;
 
         int fileCount = scanResult.get("filesFound").getAsInt();
         System.out.println("\n[Chat] Found " + fileCount + " files.");
-        if (fileCount == 0) { System.out.println("[Chat] Nothing to review."); return; }
+        if (fileCount == 0) { System.out.println("[Chat] Nothing to review."); return false; }
 
         JsonArray files = scanResult.getAsJsonArray("files");
         int limit = Math.min(3, files.size());
         System.out.println("[Chat] Reviewing first " + limit + " file(s)...");
 
         // ── Step 2: review_code per file ─────────────────────────────────────
-        StringBuilder fullReport = new StringBuilder("# Code Review — " + projectName + "\n\n");
+        StringBuilder fullReport = new StringBuilder(
+            "# Code Review Report\n\nProject: " + projectName + "\nGenerated at: " +
+            new java.util.Date() + "\n\n");
 
         for (int i = 0; i < limit; i++) {
             String filePath = files.get(i).getAsString();
@@ -171,13 +209,38 @@ public class ChatMCPClient {
             JsonObject reviewInput = new JsonObject();
             reviewInput.addProperty("fileName",    fileName);
             reviewInput.addProperty("fileContent", readFile(filePath));
-            String reviewResponse = callMCPTool("review_code", reviewInput);
+            JsonObject reviewResult = unwrapResult(callMCPTool("review_code", reviewInput));
 
-            JsonObject reviewResult = unwrapResult(reviewResponse);
             if (reviewResult != null) {
-                fullReport.append("## ").append(fileName).append("\n");
-                fullReport.append("Severity: ").append(reviewResult.get("severity").getAsString()).append("\n");
-                fullReport.append("Issues: ").append(reviewResult.get("issuesCount").getAsInt()).append("\n\n");
+                fullReport.append("\n# File: ").append(fileName).append("\n\n");
+
+                JsonArray issues = reviewResult.getAsJsonArray("issues");
+                if (issues != null && issues.size() > 0) {
+                    fullReport.append("## Issues\n");
+                    for (var el : issues) {
+                        JsonObject issue = el.getAsJsonObject();
+                        String sev  = issue.has("severity")   ? issue.get("severity").getAsString()   : "?";
+                        String type = issue.has("type")       ? issue.get("type").getAsString()       : "";
+                        String msg  = issue.has("message")    ? issue.get("message").getAsString()    : "";
+                        String sugg = issue.has("suggestion") ? issue.get("suggestion").getAsString() : "";
+                        fullReport.append("[").append(sev).append("] ");
+                        if (!type.isEmpty()) fullReport.append(type).append(": ");
+                        fullReport.append(msg);
+                        if (!sugg.isEmpty()) fullReport.append(" → ").append(sugg);
+                        fullReport.append("\n");
+                    }
+                } else {
+                    fullReport.append("No issues found.\n");
+                }
+
+                JsonArray suggestions = reviewResult.getAsJsonArray("suggestions");
+                if (suggestions != null && suggestions.size() > 0) {
+                    fullReport.append("\n## Suggestions\n");
+                    for (var s : suggestions) {
+                        fullReport.append("- ").append(s.getAsString()).append("\n");
+                    }
+                }
+                fullReport.append("\n---\n");
             }
         }
 
@@ -189,12 +252,16 @@ public class ChatMCPClient {
         saveInput.addProperty("reportContent", report);
         callMCPTool("save_report", saveInput);
 
-        // ── Update session ────────────────────────────────────────────────────
         sessionProjectPath   = projectPath;
         sessionProjectName   = projectName;
         sessionReportContent = report;
-        System.out.println("\n[Chat] Review saved to session and disk. You can now 'email' or ask for a 'summary'.");
+        System.out.println("\n[Chat] Review saved. You can 'email' or ask for a 'summary'.");
         System.out.println("══════════ Review Complete ══════════");
+        String reviewSummary = "Code review completed for project '" + projectName +
+            "', reviewed " + limit + " file(s). Report saved.";
+        recordAction(reviewSummary);
+        addToHistory("assistant", reviewSummary);
+        return true;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -216,6 +283,35 @@ public class ChatMCPClient {
         }
 
         System.out.println("\n══════════ Email via MCP ══════════");
+
+        // If there's a recent Ollama response, offer to send it directly
+        if (lastOllamaResponse != null) {
+            String preview = lastOllamaResponse.length() > 120
+                ? lastOllamaResponse.substring(0, 120) + "..." : lastOllamaResponse;
+            System.out.println("[Chat] Send the last response by email?");
+            System.out.println("  \"" + preview + "\"");
+            System.out.print("  [Y] Yes, send this   [N] No, choose something else: ");
+            String confirm = scanner.nextLine().trim().toUpperCase();
+            if (confirm.equals("Y") || confirm.isEmpty()) {
+                System.out.print("[Chat] Subject (Enter = 'From Code Review Assistant'): ");
+                String subject = scanner.nextLine().trim();
+                if (subject.isEmpty()) subject = "From Code Review Assistant";
+                JsonObject input = new JsonObject();
+                input.addProperty("reportContent", lastOllamaResponse);
+                input.addProperty("subject", subject);
+                JsonObject result = unwrapResult(callMCPTool("email_report_content", input));
+                boolean sent = result != null && "sent".equals(result.get("status").getAsString());
+                String action = sent
+                    ? "Custom email sent (subject: \"" + subject + "\") to " + config.getEmailTo()
+                    : "Email FAILED (subject: \"" + subject + "\")";
+                recordAction(action);
+                addToHistory("assistant", action);
+                System.out.println("══════════ Done ══════════");
+                return;
+            }
+            // user said N — fall through to the full menu below
+        }
+
         System.out.println("[Chat] What would you like to email?");
         System.out.println("  [1] Type a custom message");
         System.out.println("  [2] Send a saved review report");
@@ -249,7 +345,13 @@ public class ChatMCPClient {
         JsonObject input = new JsonObject();
         input.addProperty("reportContent", msg.toString());
         input.addProperty("subject", subject);
-        callMCPTool("email_report_content", input);
+        JsonObject result = unwrapResult(callMCPTool("email_report_content", input));
+        boolean sent = result != null && "sent".equals(result.get("status").getAsString());
+        String msg2 = sent
+            ? "Custom email sent (subject: \"" + subject + "\") to " + config.getEmailTo()
+            : "Custom email FAILED (subject: \"" + subject + "\")";
+        recordAction(msg2);
+        addToHistory("assistant", msg2);
     }
 
     /** Option 2 — list all saved reports + session cache, pick one, email it. */
@@ -312,10 +414,17 @@ public class ChatMCPClient {
                 System.out.println("[Chat] Review did not produce a report, nothing to email.");
                 return;
             }
+            String subj = "Code Review — " + sessionProjectName;
             JsonObject emailInput = new JsonObject();
             emailInput.addProperty("reportContent", sessionReportContent);
-            emailInput.addProperty("subject", "Code Review — " + sessionProjectName);
-            callMCPTool("email_report_content", emailInput);
+            emailInput.addProperty("subject", subj);
+            JsonObject res = unwrapResult(callMCPTool("email_report_content", emailInput));
+            boolean sent = res != null && "sent".equals(res.get("status").getAsString());
+            String msg2 = sent
+                ? "Review report for '" + sessionProjectName + "' emailed (subject: \"" + subj + "\") to " + config.getEmailTo()
+                : "Review ran but email failed for '" + sessionProjectName + "'";
+            recordAction(msg2);
+            addToHistory("assistant", msg2);
             return;
         }
 
@@ -342,7 +451,14 @@ public class ChatMCPClient {
         JsonObject emailInput = new JsonObject();
         emailInput.addProperty("reportContent", content);
         emailInput.addProperty("subject", subject);
-        callMCPTool("email_report_content", emailInput);
+        JsonObject res = unwrapResult(callMCPTool("email_report_content", emailInput));
+        boolean sent = res != null && "sent".equals(res.get("status").getAsString());
+        String projectLabel = "__session__".equals(key) ? sessionProjectName : key;
+        String msg2 = sent
+            ? "Report for '" + projectLabel + "' emailed (subject: \"" + subject + "\") to " + config.getEmailTo()
+            : "Email FAILED for report '" + projectLabel + "'";
+        recordAction(msg2);
+        addToHistory("assistant", msg2);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -352,11 +468,14 @@ public class ChatMCPClient {
     private void handleSummary(Scanner scanner) throws Exception {
         System.out.println("\n══════════ Summary via MCP ══════════");
 
-        // Use session report if available
+        // Use session report if available — show it then offer options
         if (sessionReportContent != null) {
-            System.out.println("[Chat] Summary of last review (" + sessionProjectName + "):\n");
+            System.out.println("[Chat] Last review (" + sessionProjectName + "):\n");
             System.out.println(sessionReportContent);
             System.out.println("══════════ End of Summary ══════════");
+            recordAction("Summary displayed for project '" + sessionProjectName + "'");
+            addToHistory("assistant", "Summary displayed for project '" + sessionProjectName + "'");
+            offerRegenerateOrEmail(sessionProjectPath, scanner);
             return;
         }
 
@@ -373,27 +492,80 @@ public class ChatMCPClient {
         System.out.println("[Chat] Available saved reviews:");
         for (int i = 0; i < reports.size(); i++) {
             JsonObject r = reports.get(i).getAsJsonObject();
-            System.out.printf("  [%d] %s  (%s)%n",
+            System.out.printf("  [%d] View  — %s  (%s)%n",
                 i + 1, r.get("projectName").getAsString(), r.get("timestamp").getAsString());
         }
+        System.out.println("  [R]   Regenerate a review");
+        System.out.println("  Enter — cancel");
 
-        System.out.print("[Chat] Enter number to view: ");
-        String pick = scanner.nextLine().trim();
+        String pick = "";
+        while (pick.isEmpty()) {
+            System.out.print("[Chat] Choice: ");
+            pick = scanner.nextLine().trim();
+        }
+
+        if (pick.equalsIgnoreCase("R")) {
+            // Let user pick which project to regenerate
+            System.out.println("[Chat] Which project to regenerate?");
+            for (int i = 0; i < reports.size(); i++) {
+                JsonObject r = reports.get(i).getAsJsonObject();
+                System.out.printf("  [%d] %s%n", i + 1, r.get("projectName").getAsString());
+            }
+            System.out.print("[Chat] Number: ");
+            String rePick = scanner.nextLine().trim();
+            try {
+                int idx = Integer.parseInt(rePick) - 1;
+                String projectPath = reports.get(idx).getAsJsonObject()
+                    .has("projectPath") ? reports.get(idx).getAsJsonObject().get("projectPath").getAsString() : "";
+                if (projectPath.isEmpty()) {
+                    System.out.println("[Chat] No project path saved for this report — cannot regenerate.");
+                } else {
+                    runReview(projectPath);
+                }
+            } catch (Exception e) {
+                System.out.println("[Chat] Invalid selection.");
+            }
+            System.out.println("══════════ End of Summary ══════════");
+            return;
+        }
+
         try {
-            int idx = Integer.parseInt(pick) - 1;
-            String projectName = reports.get(idx).getAsJsonObject().get("projectName").getAsString();
+            int idx         = Integer.parseInt(pick) - 1;
+            JsonObject meta = reports.get(idx).getAsJsonObject();
+            String projectName = meta.get("projectName").getAsString();
+            String projectPath = meta.has("projectPath") ? meta.get("projectPath").getAsString() : "";
+
             JsonObject loadInput = new JsonObject();
             loadInput.addProperty("projectName", projectName);
-            String loadResponse = callMCPTool("load_report", loadInput);
-            JsonObject loaded   = unwrapResult(loadResponse);
+            JsonObject loaded = unwrapResult(callMCPTool("load_report", loadInput));
             if (loaded != null && loaded.has("reportContent")) {
                 System.out.println("\n" + loaded.get("reportContent").getAsString());
                 transcript("[Summary displayed for: " + projectName + "]");
+                recordAction("Summary displayed for project '" + projectName + "'");
+                addToHistory("assistant", "Summary displayed for project '" + projectName + "'");
+                System.out.println("══════════ End of Summary ══════════");
+                offerRegenerateOrEmail(projectPath, scanner);
             }
         } catch (Exception e) {
             System.out.println("[Chat] Invalid selection.");
+            System.out.println("══════════ End of Summary ══════════");
         }
-        System.out.println("══════════ End of Summary ══════════");
+    }
+
+    /** After displaying a report, ask if the user wants to regenerate or email it. */
+    private void offerRegenerateOrEmail(String projectPath, Scanner scanner) throws Exception {
+        System.out.println("\n[Chat] Options:");
+        System.out.println("  [R] Regenerate — re-run the review");
+        System.out.println("  [E] Email this report");
+        System.out.println("  Enter   — done");
+        System.out.print("Choice: ");
+        String choice = scanner.nextLine().trim().toUpperCase();
+        if (choice.equals("R") && projectPath != null && !projectPath.isEmpty()) {
+            System.out.println("[Chat] Re-running review for: " + projectPath);
+            runReview(projectPath);
+        } else if (choice.equals("E")) {
+            handleEmail(scanner);
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -468,7 +640,16 @@ public class ChatMCPClient {
         if (topic.equals("general Java")) {
             System.out.print("[Chat] Any specific topic? (e.g. streams, generics — or Enter for general): ");
             String typed = scanner.nextLine().trim();
-            if (!typed.isEmpty()) topic = typed;
+            if (!typed.isEmpty()) {
+                // If user typed a sentence/question, route to free chat instead
+                if (typed.split("\\s+").length > 3 || typed.contains("?") ||
+                        typed.startsWith("no") || typed.startsWith("topic we") || typed.startsWith("what")) {
+                    System.out.println("[Chat] Routing your question to Ollama...");
+                    handleFreeChat(typed);
+                    return;
+                }
+                topic = typed;
+            }
         }
 
         JsonObject input = new JsonObject();
@@ -476,8 +657,12 @@ public class ChatMCPClient {
         String response = callMCPTool("java_tip", input);
         JsonObject result = unwrapResult(response);
         if (result != null) {
-            String tip = "[Java Tip — " + result.get("topic").getAsString() + "]\n" + result.get("tip").getAsString();
-            ollamaResponse(tip);
+            String tipText = result.get("tip").getAsString();
+            String label   = "[Java Tip — " + result.get("topic").getAsString() + "]";
+            ollamaResponse(label + "\n" + tipText);
+            // Add to history so "give me an example" / "more detail" works as follow-up
+            addToHistory("user",      "Give me a Java tip about " + topic);
+            addToHistory("assistant", tipText);
         }
         System.out.println("══════════════════════════════════════");
     }
@@ -496,11 +681,22 @@ public class ChatMCPClient {
         JsonObject input = new JsonObject();
         input.addProperty("question",    userInput);
         input.addProperty("dateContext", dow + " " + today);
+        input.add("history", historyAsJson());
+
+        // Pass completed actions so the system prompt can state them as hard facts
+        if (!completedActions.isEmpty()) {
+            JsonArray acts = new JsonArray();
+            completedActions.forEach(acts::add);
+            input.add("completedActions", acts);
+        }
 
         String response = callMCPTool("free_chat", input);
         JsonObject result = unwrapResult(response);
         if (result != null && result.has("answer")) {
-            ollamaResponse(result.get("answer").getAsString());
+            String answer = result.get("answer").getAsString();
+            ollamaResponse(answer);
+            addToHistory("user",      userInput);
+            addToHistory("assistant", answer);
         }
     }
 
@@ -541,12 +737,38 @@ public class ChatMCPClient {
     // ─────────────────────────────────────────────────────────────────────────
 
     private String classifyIntent(String userInput) {
-        // Fast-path: single-word or short commands don't need LLM
         String lower = userInput.toLowerCase().trim();
+
+        // Follow-up / conversational phrases always go to free chat
+        if (lower.startsWith("can you")    || lower.startsWith("could you")   ||
+            lower.startsWith("tell me")    || lower.startsWith("explain")     ||
+            lower.startsWith("elaborate")  || lower.equals("more")            ||
+            lower.startsWith("more about") || lower.startsWith("what about")  ||
+            lower.startsWith("go on")      || lower.startsWith("and ")        ||
+            lower.startsWith("why ")       || lower.startsWith("how ")        ||
+            lower.startsWith("it is")      || lower.startsWith("it's")        ||
+            lower.startsWith("that is")    || lower.startsWith("that's")      ||
+            lower.startsWith("i mean")     || lower.startsWith("i want")) return "UNKNOWN";
+
+        // Questions about past actions — never re-trigger a command
+        if (lower.startsWith("have you")   || lower.startsWith("did you")     ||
+            lower.startsWith("i asked you")|| lower.startsWith("what did you")||
+            lower.startsWith("did it")     || lower.startsWith("was it")      ||
+            lower.startsWith("was the")    || lower.startsWith("is it sent")) return "UNKNOWN";
+
+        // General knowledge questions about Java go to free chat, not TIP
+        if ((lower.startsWith("what is") || lower.startsWith("what are") ||
+             lower.startsWith("which")   || lower.startsWith("when was") ||
+             lower.startsWith("where")   || lower.startsWith("who "))
+            && lower.contains("java")) return "UNKNOWN";
+
+        // Fast-path: single-word or short commands
         if (lower.equals("review") || lower.startsWith("review "))   return "REVIEW";
         if (lower.equals("email")  || lower.startsWith("email ")
                                    || lower.equals("send email")
-                                   || lower.startsWith("send report")) return "EMAIL";
+                                   || lower.startsWith("send report")
+                                   || lower.equals("mail it")
+                                   || lower.equals("send mail"))      return "EMAIL";
         if (lower.equals("summary") || lower.startsWith("summary"))  return "SUMMARY";
         if (lower.equals("list")   || lower.equals("list reports"))   return "LIST";
         if (lower.equals("date")   || lower.equals("time")
@@ -565,7 +787,9 @@ public class ChatMCPClient {
               SUMMARY - user wants to see a summary or view a past review
               LIST    - user wants to list or show saved reviews or reports
               DATE    - user asks about the current date, time, day, month, season, or year
-              TIP     - user explicitly asks for a Java programming tip, trick, or knowledge
+              TIP     - user explicitly asks for a Java tip, trick, or best practice
+                        (ONLY for: "give me a tip", "tip about X", "best practice for X", "show me a trick")
+                        NOT for general Java questions, elaborations, or follow-ups
               HELP    - user asks to see the menu, commands list, or available options
                         (ONLY for: "show commands", "show options", "what can you do", "help menu")
               UNKNOWN - greetings, small talk, general knowledge questions, questions about
@@ -637,10 +861,11 @@ public class ChatMCPClient {
               date            → ask MCP for today's date and time
               tip [topic]     → get a Java programming tip via MCP + Ollama
               help            → show this menu
+              clear           → clear conversation history (start fresh)
               exit            → quit
 
             Anything else (e.g. "is it summer?", "who is Picasso?") →
-              answered directly by Ollama
+              answered directly by Ollama (with full conversation context)
             """);
     }
 
@@ -672,6 +897,43 @@ public class ChatMCPClient {
             .format(DateTimeFormatter.ofPattern("HH:mm:ss"));
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Conversation history helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void recordAction(String description) {
+        completedActions.add("[" + timestamp() + "] " + description);
+        logger.info("Action recorded: {}", description);
+    }
+
+    private void addToHistory(String role, String content) {
+        conversationHistory.add(java.util.Map.of("role", role, "content", content));
+        // Trim to sliding window: keep last MAX_HISTORY_TURNS pairs (×2 messages each)
+        while (conversationHistory.size() > MAX_HISTORY_TURNS * 2) {
+            conversationHistory.remove(0);
+        }
+        logger.debug("History size: {} messages", conversationHistory.size());
+    }
+
+    private JsonArray historyAsJson() {
+        JsonArray arr = new JsonArray();
+        for (var msg : conversationHistory) {
+            JsonObject m = new JsonObject();
+            m.addProperty("role",    msg.get("role"));
+            m.addProperty("content", msg.get("content"));
+            arr.add(m);
+        }
+        return arr;
+    }
+
+    private void clearHistory() {
+        int size = conversationHistory.size();
+        conversationHistory.clear();
+        chat("Conversation history cleared (" + size / 2 + " turns removed). Starting fresh.");
+        transcript("[History cleared]");
+        logger.info("Conversation history cleared ({} messages)", size);
+    }
+
     private void chat(String msg) {
         System.out.println("[Chat] " + msg);
         logger.info("[Chat] {}", msg);
@@ -682,6 +944,7 @@ public class ChatMCPClient {
         System.out.println("\n[Ollama] " + msg);
         logger.info("[Ollama] {}", msg);
         transcript("[Ollama] " + msg);
+        lastOllamaResponse = msg;
     }
 
     private void logConversation(String role, String msg) {

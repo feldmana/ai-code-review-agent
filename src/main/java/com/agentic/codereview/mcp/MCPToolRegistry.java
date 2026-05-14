@@ -374,26 +374,65 @@ public class MCPToolRegistry {
             })
             .build());
 
-        // free_chat — general-purpose Ollama tool; any question goes here
+        // free_chat — general-purpose Ollama tool with optional conversation history
         Map<String, Object> chatSchema = new HashMap<>();
         chatSchema.put("type", "object");
         chatSchema.put("properties", Map.of(
-            "question",    Map.of("type", "string", "description", "Any natural language question"),
-            "dateContext", Map.of("type", "string", "description", "Optional: today's date to inject into context")
+            "question",         Map.of("type", "string", "description", "The current question"),
+            "dateContext",      Map.of("type", "string", "description", "Optional: today's date string"),
+            "history",          Map.of("type", "array",  "description", "Optional: prior turns as [{role,content}]"),
+            "completedActions", Map.of("type", "array",  "description", "Optional: list of actions completed this session")
         ));
         chatSchema.put("required", List.of("question"));
         tools.put("free_chat", new MCPTool.Builder()
             .name("free_chat")
-            .description("Forward any question to Ollama and return the answer. Date context is injected automatically.")
+            .description("Forward a question to Ollama with optional conversation history for multi-turn context.")
             .inputSchema(chatSchema)
             .handler(input -> {
                 try {
                     String question    = input.get("question").getAsString();
                     String dateContext = input.has("dateContext") ? input.get("dateContext").getAsString() : "";
-                    String prompt      = dateContext.isEmpty()
-                        ? "Answer concisely (2-3 sentences): " + question
-                        : "Today is " + dateContext + ".\nAnswer concisely (2-3 sentences): " + question;
-                    String answer = ollama.generateResponse(prompt);
+
+                    String answer;
+                    if (input.has("history") && input.getAsJsonArray("history").size() > 0) {
+                        // ── Multi-turn: build full messages list from history + new question ──
+                        java.util.List<java.util.Map<String, String>> messages = new java.util.ArrayList<>();
+
+                        // Build system prompt with explicit completed-action facts
+                        StringBuilder sys = new StringBuilder();
+                        sys.append("You are a helpful code review assistant running inside a Java application. ");
+                        sys.append("You CAN send emails, run code reviews, and save reports — these are handled by tools in the system. ");
+                        if (!dateContext.isEmpty()) sys.append("Today is ").append(dateContext).append(". ");
+
+                        if (input.has("completedActions") && input.getAsJsonArray("completedActions").size() > 0) {
+                            sys.append("IMPORTANT — the following actions were SUCCESSFULLY completed in this session: ");
+                            for (var a : input.getAsJsonArray("completedActions")) {
+                                sys.append("\n- ").append(a.getAsString());
+                            }
+                            sys.append("\nWhen the user asks about these actions, confirm they were done. ");
+                        }
+                        sys.append("Answer concisely (2-3 sentences).");
+                        messages.add(java.util.Map.of("role", "system", "content", sys.toString()));
+
+                        for (var el : input.getAsJsonArray("history")) {
+                            com.google.gson.JsonObject m = el.getAsJsonObject();
+                            messages.add(java.util.Map.of(
+                                "role",    m.get("role").getAsString(),
+                                "content", m.get("content").getAsString()
+                            ));
+                        }
+                        messages.add(java.util.Map.of("role", "user", "content", question));
+
+                        logger.info("free_chat: multi-turn call with {} history messages", messages.size() - 1);
+                        answer = ollama.chatWithHistory(messages);
+                    } else {
+                        // ── Single-turn fallback ──────────────────────────────────────────
+                        String prompt = dateContext.isEmpty()
+                            ? "Answer concisely (2-3 sentences): " + question
+                            : "Today is " + dateContext + ".\nAnswer concisely (2-3 sentences): " + question;
+                        answer = ollama.generateResponse(prompt);
+                    }
+
                     return gson.toJson(Map.of("answer", answer.trim()));
                 } catch (Exception e) {
                     return gson.toJson(Map.of("error", e.getMessage()));

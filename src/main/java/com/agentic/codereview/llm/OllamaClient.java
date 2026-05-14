@@ -8,6 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -99,6 +101,48 @@ public class OllamaClient {
         }
 
         return text.substring(start, end + 1);
+    }
+
+    /**
+     * Multi-turn chat — sends the full message history so the model has context
+     * of previous turns.  Each entry must have "role" (user/assistant) and "content".
+     */
+    public String chatWithHistory(List<Map<String, String>> messages) throws IOException {
+        String url = "http://127.0.0.1:11434/api/chat";
+
+        JsonObject requestBody = new JsonObject();
+        requestBody.addProperty("model", model);
+        requestBody.addProperty("stream", false);
+
+        JsonArray messagesArray = new JsonArray();
+        for (Map<String, String> msg : messages) {
+            JsonObject m = new JsonObject();
+            m.addProperty("role",    msg.get("role"));
+            m.addProperty("content", msg.get("content"));
+            messagesArray.add(m);
+        }
+        requestBody.add("messages", messagesArray);
+
+        logger.debug("chatWithHistory: {} messages → Ollama", messages.size());
+
+        Request request = new Request.Builder()
+                .url(url)
+                .post(RequestBody.create(requestBody.toString(), MediaType.parse("application/json")))
+                .build();
+
+        try (Response response = httpClient.newCall(request).execute()) {
+            String responseText = response.body() != null ? response.body().string() : "";
+            if (!response.isSuccessful()) {
+                logger.error("Ollama API error: {} body: {}", response.code(), responseText);
+                throw new IOException("Failed to get response from Ollama: " + response.code());
+            }
+            String cleaned = extractJson(responseText);
+            JsonObject json = JsonParser.parseString(cleaned).getAsJsonObject();
+            if (json.has("message") && json.getAsJsonObject("message").has("content")) {
+                return json.getAsJsonObject("message").get("content").getAsString();
+            }
+            throw new IOException("Invalid Ollama response format: " + responseText);
+        }
     }
 
     /**
